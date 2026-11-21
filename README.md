@@ -1,14 +1,6 @@
 # Hospital_Management_System
 
-![Hospital Management System ERD](docs/diagrams/ERD.png)
-
-# Hospital Management System (HMS)
-
-### 1. Project Overview
-
-The Hospital Management System (HMS) is a university software engineering project developed to manage and organize hospital information through a computerized system.
-
-The system aims to make hospital operations more organized, efficient, and easier to manage by replacing manual record-keeping with a computerized solution.
+# Hospital to make hospital operations more organized, efficient, and easier to manage by replacing manual record-keeping with a computerized solution.
 
 ## 2. Project Objectives
 
