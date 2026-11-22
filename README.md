@@ -34,6 +34,8 @@ Hospital_Management_System/
 ├── frontend/
 │
 ├── backend/
+|   |-- Java_connection
+|       javaScript
 │
 ├── database/
 │
