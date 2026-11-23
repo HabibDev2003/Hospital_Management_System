@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>NovaX | Hospital Management System</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="script.js" defer></script>
+</head>
+<body>
+
+<div class="auth-screen" id="authScreen">
+    <div class="auth-orb auth-orb-one"></div>
+    <div class="auth-orb auth-orb-two"></div>
+    <div class="auth-shell">
+        <section class="auth-showcase">
+            <div class="auth-brand">
+                <div class="logo">N</div>
+                <div><b>NovaX</b><small>HOSPITAL OS</small></div>
+            </div>
+            <div class="auth-showcase-copy">
+                <span class="auth-kicker"><span class="pulse-dot"></span> THE FUTURE OF CARE MANAGEMENT</span>
+                <h1>Care smarter.<br><span class="gradient">Work beautifully.</span></h1>
+                <p>A calmer, clearer workspace for the people who care for people. Securely access your hospital workspace and keep every detail connected.</p>
+            </div>
+            <div class="auth-feature-list">
+                <div class="auth-feature"><span>✦</span><div><b>One connected workspace</b><small>Patients, teams and operations together</small></div></div>
+                <div class="auth-feature"><span>◈</span><div><b>Designed for clarity</b><small>Thoughtful tools for everyday workflows</small></div></div>
+            </div>
+            <div class="auth-showcase-foot">NOVAX HOSPITAL OS <span>•</span> YOUR WORKSPACE, REIMAGINED</div>
+        </section>
+
+        <section class="auth-panel">
+            <div class="auth-mobile-brand">
+                <div class="logo">N</div><b>NovaX</b>
+            </div>
+            <div class="auth-heading">
+                <span class="auth-kicker">WELCOME TO NOVAX</span>
+                <h2 id="authTitle">Welcome back</h2>
+                <p id="authSubtitle">Sign in to continue to your hospital workspace.</p>
+            </div>
+
+            <div class="auth-tabs" role="tablist" aria-label="Authentication options">
+                <button type="button" class="auth-tab active" id="loginTab" data-auth-mode="login">Sign in</button>
+                <button type="button" class="auth-tab" id="registerTab" data-auth-mode="register">Create account</button>
+            </div>
+
+            <form id="loginForm" class="auth-form" autocomplete="on">
+                <label class="auth-field">
+                    <span>Username</span>
+                    <div class="auth-input-wrap"><span>♙</span><input id="loginUsername" type="text" placeholder="Enter your staff username" autocomplete="username" required></div>
+                </label>
+                <label class="auth-field">
+                    <span>Password</span>
+                    <div class="auth-input-wrap"><span>⌑</span><input id="loginPassword" type="password" placeholder="Enter your password" autocomplete="current-password" required><button class="password-toggle" type="button" data-toggle-password="loginPassword" aria-label="Show password">◉</button></div>
+                </label>
+                <button class="auth-submit" type="submit"><span>Sign in to NovaX</span><b>→</b></button>
+                <p class="auth-switch">New to NovaX? <button type="button" data-switch-auth="register">Create an account</button></p>
+            </form>
+
+            <form id="registerForm" class="auth-form" autocomplete="on" hidden>
+                <label class="auth-field">
+                    <span>Full name</span>
+                    <div class="auth-input-wrap"><span>♙</span><input id="registerName" type="text" placeholder="Your full name" autocomplete="name" maxlength="80" required></div>
+                </label>
+
+
+                <label class="auth-field">
+                <span>Username</span>
+                <div class="auth-input-wrap">
+                    <span>♙</span>
+                    <input id="registerUsername"
+                    type="text"
+                    placeholder="Choose a username"
+                    autocomplete="username"
+                    maxlength="50"
+                    required>
+                    </div>
+                </label>
+
+
+                <label class="auth-field">
+                    <span>Email address</span>
+                    <div class="auth-input-wrap"><span>✉</span><input id="registerEmail" type="email" placeholder="you@hospital.com" autocomplete="email" maxlength="160" required></div>
+                </label>
+                <label class="auth-field">
+                    <span>Password</span>
+                    <div class="auth-input-wrap"><span>⌑</span><input id="registerPassword" type="password" placeholder="At least 8 characters" autocomplete="new-password" minlength="8" required><button class="password-toggle" type="button" data-toggle-password="registerPassword" aria-label="Show password">◉</button></div>
+                </label>
+                <label class="auth-field">
+                    <span>Confirm password</span>
+                    <div class="auth-input-wrap"><span>⌑</span><input id="registerConfirm" type="password" placeholder="Enter your password again" autocomplete="new-password" minlength="8" required></div>
+                </label>
+                <button class="auth-submit" type="submit"><span>Create my account</span><b>→</b></button>
+                <p class="auth-switch">Already have an account? <button type="button" data-switch-auth="login">Sign in</button></p>
+            </form>
+
+            <div class="auth-message" id="authMessage" role="status" aria-live="polite"></div>
+            <div class="auth-security"><span>◇</span> Staff accounts are securely managed by NovaX.</div>
+        </section>
+    </div>
+</div>
+
+<div class="app" id="mainApp">
+    <aside class="side">
+        <div class="brand">
+            <div class="logo">N</div>
+            <div><b>NovaX</b><small>HOSPITAL OS</small></div>
+        </div>
+
+        <div>
+            <div class="navlabel">HOSPITAL WORKSPACE</div>
+            <nav class="nav" id="nav">
+                <button class="active" data-page="dashboard"><i>◈</i>Dashboard</button>
+                <button data-page="patients"><i>♙</i>Patients</button>
+                <button data-page="doctors"><i>✚</i>Doctors</button>
+                <button data-page="departments"><i>▦</i>Departments</button>
+                <button data-page="appointments"><i>◷</i>Appointments</button>
+                <button data-page="prescriptions"><i>▤</i>Prescriptions</button>
+                <button data-page="medicines"><i>✧</i>Medicines</button>
+                <button data-page="prescriptionMedicines"><i>＋</i>Prescription Medicines</button>
+                <button data-page="payments"><i>＄</i>Payments</button>
+                <button data-page="expenses"><i>↗</i>Expenses</button>
+                <button data-page="users"><i>♧</i>Staff & Users</button>
+                <button data-page="profile"><i>◎</i>My Profile</button>
+            </nav>
+        </div>
+
+        <div class="side-note">
+            <div class="live">NovaX is active</div>
+            Records are saved in this browser using local storage.
+            Oracle database connection is not configured.
+        </div>
+    </aside>
+
+    <main>
+        <div class="top">
+            <div class="crumb">Workspace / <b id="crumb">Dashboard</b></div>
+            <div class="topright">
+                <div class="topsearch">
+                    <span>⌕</span>
+                    <input id="globalSearch" class="input" placeholder="Search current page...">
+                </div>
+                <button class="avatar avatar-button" id="userAvatar" type="button" title="Open my profile" aria-label="Open my profile">NX</button>
+                <button class="btn logout-btn" id="logoutButton" type="button" title="Sign out">↪ <span>Sign out</span></button>
+            </div>
+        </div>
+
+        <section class="page active" id="page-dashboard">
+            <div class="welcome">
+                <div>
+                    <div class="eyebrow">Hospital operations · overview</div>
+                    <h1>Welcome to the <span class="gradient">NovaX</span></h1>
+                    <p>One modern workspace for patient care, clinical teams, appointments and hospital operations.</p>
+                </div>
+                <button class="btn primary" onclick="go('appointments');openForm('appointments')">
+                    ＋ New appointment
+                </button>
+            </div>
+
+            <div class="stats">
+                <div class="stat" style="--tone:var(--cyan)">
+                    <div class="stathead">Patients <span class="staticon">♙</span></div>
+                    <strong id="sPatients">0</strong>
+                    <small>Registered patient records</small>
+                </div>
+                <div class="stat" style="--tone:var(--violet)">
+                    <div class="stathead">Doctors <span class="staticon">✚</span></div>
+                    <strong id="sDoctors">0</strong>
+                    <small>Registered medical team</small>
+                </div>
+                <div class="stat" style="--tone:var(--pink)">
+                    <div class="stathead">Appointments <span class="staticon">◷</span></div>
+                    <strong id="sAppointments">0</strong>
+                    <small>All appointment records</small>
+                </div>
+                <div class="stat" style="--tone:var(--gold)">
+                    <div class="stathead">Medicines <span class="staticon">✧</span></div>
+                    <strong id="sMedicines">0</strong>
+                    <small>Medicine types in inventory</small>
+                </div>
+            </div>
+
+            <div class="grid">
+                <div class="panel">
+                    <div class="panelhead">
+                        <div>
+                            <h2>Monthly activity</h2>
+                            <div class="sub">Illustrative chart · sample activity, not live reporting</div>
+                        </div>
+                        <span class="pill">Overview</span>
+                    </div>
+
+                    <div class="bars">
+                        <div class="barcol"><div class="barpair"><div class="bar" style="height:45%"></div><div class="bar alt" style="height:35%"></div></div><label>May</label></div>
+                        <div class="barcol"><div class="barpair"><div class="bar" style="height:60%"></div><div class="bar alt" style="height:45%"></div></div><label>Jun</label></div>
+                        <div class="barcol"><div class="barpair"><div class="bar" style="height:52%"></div><div class="bar alt" style="height:65%"></div></div><label>Jul</label></div>
+                        <div class="barcol"><div class="barpair"><div class="bar" style="height:76%"></div><div class="bar alt" style="height:55%"></div></div><label>Aug</label></div>
+                        <div class="barcol"><div class="barpair"><div class="bar" style="height:68%"></div><div class="bar alt" style="height:75%"></div></div><label>Sep</label></div>
+                        <div class="barcol"><div class="barpair"><div class="bar" style="height:90%"></div><div class="bar alt" style="height:80%"></div></div><label>Oct</label></div>
+                    </div>
+
+                    <div class="legend">
+                        <span><i></i>Patient visits</span>
+                        <span><i class="p"></i>Appointments</span>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panelhead">
+                        <div>
+                            <h2>Appointment status</h2>
+                            <div class="sub">Calculated from current records</div>
+                        </div>
+                    </div>
+                    <div class="donutrow">
+                        <div class="donut">
+                            <div class="donutcenter">
+                                <strong id="apptTotal">0</strong>
+                                <small>appointments</small>
+                            </div>
+                        </div>
+                        <div class="key">
+                            <div><i style="--c:var(--cyan)"></i>Scheduled <b id="cScheduled">0</b></div>
+                            <div><i style="--c:var(--violet)"></i>Completed <b id="cCompleted">0</b></div>
+                            <div><i style="--c:var(--pink)"></i>Cancelled <b id="cCancelled">0</b></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel tablepanel">
+                <div class="panelhead">
+                    <div>
+                        <h2>Recent appointments</h2>
+                        <div class="sub">Linked to patient and doctor records</div>
+                    </div>
+                    <button class="btn" onclick="go('appointments')">Manage appointments ↗</button>
+                </div>
+                <div class="tablewrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Appointment</th><th>Patient</th><th>Doctor</th>
+                                <th>Date / Time</th><th>Status</th><th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dashAppointments"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <div id="dataPages"></div>
+
+        <!-- PERSONAL ACCOUNT PROFILE -->
+        <section class="page" id="page-profile">
+            <div class="intro">
+                <div>
+                    <div class="eyebrow">Your account · personal settings</div>
+                    <h1>My Profile</h1>
+                    <p>Manage your personal information and profile picture.</p>
+                </div>
+            </div>
+
+            <div class="profile-layout">
+                <section class="panel profile-card">
+                    <div class="profile-card-heading">
+                        <div>
+                            <div class="eyebrow">PERSONAL PROFILE</div>
+                            <h2>Your identity</h2>
+                            <p class="sub">This information is shown with your NovaX account.</p>
+                        </div>
+                    </div>
+                    <div class="profile-photo-area">
+                        <div class="profile-photo" id="profilePhotoPreview" aria-label="Profile picture preview">NX</div>
+                        <div class="profile-photo-actions">
+                            <label class="btn primary" for="profilePhotoInput">↑ Upload photo</label>
+                            <button class="btn" type="button" id="removeProfilePhoto">Remove photo</button>
+                            <input id="profilePhotoInput" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+                            <small>JPG, PNG or WEBP · up to 5 MB</small>
+                        </div>
+                    </div>
+                    <form id="profileForm" class="profile-form">
+                        <div class="fields">
+                            <div class="field">
+                                <label for="profileName">Full name</label>
+                                <input class="input" id="profileName" name="name" type="text" maxlength="80" required>
+                            </div>
+                            <div class="field">
+                                <label for="profileEmail">Email address</label>
+                                <input class="input" id="profileEmail" name="email" type="email" maxlength="160" required>
+                            </div>
+                        </div>
+                        <div class="profile-form-actions">
+                            <button class="btn primary" type="submit">Save profile changes</button>
+                            <span class="hint" id="profileSaveMessage" role="status" aria-live="polite"></span>
+                        </div>
+                    </form>
+                </section>
+
+                <aside class="panel profile-account-card">
+                    <div class="eyebrow">ACCOUNT DETAILS</div>
+                    <h2>Account information</h2>
+                    <div class="profile-detail"><span>Account status</span><b><i class="profile-status-dot"></i> Active</b></div>
+                    <div class="profile-detail"><span>Member since</span><b id="profileCreatedAt">—</b></div>
+                    <div class="profile-detail"><span>Account ID</span><b id="profileAccountId">—</b></div>
+                    <div class="profile-note">Your profile details and picture are saved locally in this browser, alongside your NovaX account.</div>
+                </aside>
+            </div>
+        </section>
+
+        <div class="footer">NOVAX HOSPITAL OS · Frontend demo · Not connected to Oracle database</div>
+    </main>
+</div>
+
+<div class="modal" id="modal">
+    <div class="modalbox">
+        <div class="panelhead">
+            <div>
+                <div class="eyebrow">NovaX record manager</div>
+                <h2 id="modalTitle" style="margin-top:6px">Add record</h2>
+            </div>
+            <button class="btn" type="button" onclick="closeForm()">✕ Close</button>
+        </div>
+        <form id="recordForm">
+            <div id="fields" class="fields"></div>
+            <div class="modalactions">
+                <button class="btn" type="button" onclick="closeForm()">Cancel</button>
+                <button class="btn primary" type="submit">Save record</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+</body>
+</html>
