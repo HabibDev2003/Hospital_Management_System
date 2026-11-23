@@ -8,7 +8,7 @@ const schema = {
         singular: "patient",
         fields: [
             ["name", "Full name", "text", 1],
-            ["gender", "Gender", "select", 1, ["Female", "Male", "Other"]],
+            ["gender", "Gender", "select", 1, ["Female", "Male"]],
             ["dob", "Date of birth", "date", 1],
             ["phone", "Phone number", "tel", 1],
             ["address", "Address", "text", 1],
