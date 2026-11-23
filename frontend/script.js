@@ -92,7 +92,7 @@ const schema = {
             ["date", "Payment date", "date", 1],
             ["method", "Payment method", "select", 1, ["Cash", "Card"]],
             ["status", "Payment status", "select", 1,
-                ["Paid", "Pending", "Failed"]]
+                ["Paid", "Pending"]]
         ]
     },
 
