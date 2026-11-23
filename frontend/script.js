@@ -90,7 +90,7 @@ const schema = {
             ["patientId", "Patient", "ref:patients", 1],
             ["amount", "Amount (AFN)", "number", 1],
             ["date", "Payment date", "date", 1],
-            ["method", "Payment method", "select", 1, ["Cash", "Card"]],
+            ["method", "Payment method", "select", 1, ["Cash", "Card", "Bank Transfer"]],
             ["status", "Payment status", "select", 1,
                 ["Paid", "Pending"]]
         ]
