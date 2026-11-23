@@ -232,12 +232,46 @@ async function loadData() {
             throw new Error("Could not load departments from the server.");
         }
 
-        db.departments = await response.json();
+        db.departments = (await response.json()).map(item => ({
+        id: item.DEPARTMENT_ID,
+        name: item.DEPARTMENT_NAME,
+        location: item.LOCATION
+    }));
 
     } catch (error) {
         console.error("Data loading error:", error);
     }
 }
+
+
+
+async function saveDepartmentToAPI(record, isEditing, id) {
+    const department = {
+        departmentId: isEditing ? Number(id) : Number(record.id),
+        departmentName: record.name,
+        location: record.location
+    };
+
+    const url = isEditing
+        ? `/api/departments/${id}`
+        : "/api/departments";
+
+    const response = await fetch(url, {
+        method: isEditing ? "PUT" : "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(department)
+    });
+
+    if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || "Department operation failed.");
+    }
+
+    return true;
+}
+
 
 
 function save() {
@@ -388,12 +422,14 @@ function rowCells(key, item) {
                 esc(item.email)
             ];
 
+        
         case "departments":
-            return [
-                "DP-" + String(item.id).padStart(3, "0"),
-                esc(item.name),
-                esc(item.location)
-            ];
+        return [
+            "DP-" + String(item.id).padStart(3, "0"),
+            esc(item.name),
+            esc(item.location)
+        ];
+
 
         case "appointments":
             return [
@@ -730,7 +766,7 @@ function collectDeleteTree(bucket, id, seen = new Set(), result = []) {
     return result;
 }
 
-function deleteRecord(bucket, id) {
+async function deleteRecord(bucket, id) {
     if (!get(bucket, id)) {
         toast("Record not found. Refresh the page and try again.");
         return;
@@ -747,6 +783,29 @@ function deleteRecord(bucket, id) {
           + "? This cannot be undone.";
 
     if (!window.confirm(message)) return;
+
+        if (bucket === "departments") {
+        try {
+            const response = await fetch(`/api/departments/${id}`, {
+                method: "DELETE"
+            });
+
+            if (!response.ok) {
+                throw new Error(await response.text() || "Department deletion failed.");
+            }
+
+            db.departments = db.departments.filter(
+                item => Number(item.id) !== Number(id)
+            );
+
+            render();
+            toast("Department deleted successfully.");
+        } catch (error) {
+            console.error(error);
+            toast("Department delete failed: " + error.message);
+        }
+        return;
+    }
 
     const previousData = JSON.stringify(db);
 
@@ -769,7 +828,7 @@ function deleteRecord(bucket, id) {
         : "Record deleted successfully.");
 }
 
-$("recordForm").addEventListener("submit", event => {
+$("recordForm").addEventListener("submit", async event => {
     event.preventDefault();
 
     const key = editing?.key || currentPage;
@@ -831,6 +890,57 @@ $("recordForm").addEventListener("submit", event => {
         toast("Choose an existing staff user.");
         return;
     }
+
+
+
+    // Save departments directly through Java API to Oracle
+    if (key === "departments") {
+        const isEditing = Boolean(editing);
+
+        if (!isEditing) {
+            record.id = Math.max(
+                0,
+                ...db.departments.map(item =>
+                    Number(item.id) || 0
+                )
+            ) + 1;
+        }
+
+        try {
+            await saveDepartmentToAPI(
+                record,
+                isEditing,
+                editing?.id
+            );
+
+            const response = await fetch("/api/departments");
+
+            if (!response.ok) {
+                throw new Error("Could not refresh departments.");
+            }
+
+            db.departments = (await response.json()).map(item => ({
+            id: item.DEPARTMENT_ID,
+            name: item.DEPARTMENT_NAME,
+            location: item.LOCATION
+            }));
+
+            closeForm();
+            render();
+
+            toast(isEditing
+                ? "Department updated successfully."
+                : "Department created successfully.");
+
+        } catch (error) {
+            console.error(error);
+            toast("Department save failed: " + error.message);
+        }
+
+        return;
+    }
+
+
 
     const previousData = JSON.stringify(db);
 
