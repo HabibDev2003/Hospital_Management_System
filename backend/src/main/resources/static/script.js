@@ -1019,7 +1019,8 @@ function setAuthMode(mode = "login") {
     showAuthMessage("");
 }
 
-function startAuthenticatedSession(user) {
+
+async function startAuthenticatedSession(user) {
     sessionStorage.setItem(authSessionKey, JSON.stringify(user));
 
     $("authScreen").classList.add("auth-hidden");
@@ -1029,12 +1030,14 @@ function startAuthenticatedSession(user) {
     populateProfile(user);
 
     if (!window.novaxAppInitialized) {
-        loadData();
+        window.novaxAppInitialized = true;
+
+        await loadData();
         buildPages();
         render();
-        window.novaxAppInitialized = true;
     }
 }
+
 
 function getCurrentAuthUser() {
     try {
