@@ -256,6 +256,24 @@ async function loadData() {
             blood: item.BLOOD_GROUP
         }));
 
+
+                // Load doctors directly from Oracle
+        const doctorResponse = await fetch("/api/doctors");
+
+        if (!doctorResponse.ok) {
+            throw new Error("Could not load doctors from the server.");
+        }
+
+        db.doctors = (await doctorResponse.json()).map(item => ({
+            id: item.doctorId,
+            name: item.doctorName,
+            specialty: item.specialization,
+            phone: item.phoneNumber,
+            email: item.email,
+            departmentId: item.departmentId
+        }));
+
+
     } catch (error) {
         console.error("Data loading error:", error);
     }
@@ -318,6 +336,38 @@ async function savePatientToAPI(record, isEditing, id) {
     if (!response.ok) {
         const message = await response.text();
         throw new Error(message || "Patient operation failed.");
+    }
+
+    return true;
+}
+
+
+
+async function saveDoctorToAPI(record, isEditing, id) {
+    const doctor = {
+        doctorId: isEditing ? Number(id) : Number(record.id),
+        doctorName: record.name,
+        specialization: record.specialty,
+        phoneNumber: record.phone,
+        email: record.email,
+        departmentId: Number(record.departmentId)
+    };
+
+    const url = isEditing
+        ? `/api/doctors/${id}`
+        : "/api/doctors";
+
+    const response = await fetch(url, {
+        method: isEditing ? "PUT" : "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(doctor)
+    });
+
+    if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || "Doctor operation failed.");
     }
 
     return true;
@@ -465,7 +515,7 @@ function rowCells(key, item) {
 
         case "doctors":
             return [
-                person("Dr. " + item.name, item.email),
+                person(item.name, item.email),
                 "DR-" + String(item.id).padStart(3, "0"),
                 esc(item.specialty),
                 esc(refLabel("departments", item.departmentId)),
@@ -887,6 +937,36 @@ async function deleteRecord(bucket, id) {
 }
 
 
+
+    // Delete doctors directly from Oracle
+    if (bucket === "doctors") {
+        try {
+            const response = await fetch(`/api/doctors/${id}`, {
+                method: "DELETE"
+            });
+
+            if (!response.ok) {
+                throw new Error(
+                    await response.text() || "Doctor deletion failed."
+                );
+            }
+
+            db.doctors = db.doctors.filter(
+                item => Number(item.id) !== Number(id)
+            );
+
+            render();
+            toast("Doctor deleted successfully.");
+
+        } catch (error) {
+            console.error(error);
+            toast("Doctor delete failed: " + error.message);
+        }
+
+        return;
+    }
+
+
     const previousData = JSON.stringify(db);
 
     tree.forEach(entry => {
@@ -1065,6 +1145,56 @@ if (key === "patients") {
     } catch (error) {
         console.error(error);
         toast("Patient save failed: " + error.message);
+    }
+
+    return;
+}
+
+
+
+// Save doctors directly through Java API to Oracle
+if (key === "doctors") {
+    const isEditing = Boolean(editing);
+
+    if (!isEditing) {
+        record.id = Math.max(
+            0,
+            ...db.doctors.map(item => Number(item.id) || 0)
+        ) + 1;
+    }
+
+    try {
+        await saveDoctorToAPI(
+            record,
+            isEditing,
+            editing?.id
+        );
+
+        const response = await fetch("/api/doctors");
+
+        if (!response.ok) {
+            throw new Error("Could not refresh doctors.");
+        }
+
+        db.doctors = (await response.json()).map(item => ({
+            id: item.doctorId,
+            name: item.doctorName,
+            specialty: item.specialization,
+            phone: item.phoneNumber,
+            email: item.email,
+            departmentId: item.departmentId
+        }));
+
+        closeForm();
+        render();
+
+        toast(isEditing
+            ? "Doctor updated successfully."
+            : "Doctor created successfully.");
+
+    } catch (error) {
+        console.error(error);
+        toast("Doctor save failed: " + error.message);
     }
 
     return;

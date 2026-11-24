@@ -102,6 +102,16 @@ Additional technologies will be added as development progresses.
 
 ## 8. Getting Started
 
+___________________________________________________________________________________
+
+$env:Path += ";C:\Windows\System32;C:\Windows\System32\WindowsPowerShell\v1.0"
+
+$env:ORACLE_PASSWORD = "allah"
+
+.\mvnw.cmd spring-boot:run
+
+___________________________________________________________________________________
+
 Follow these steps to get a local copy of the project.
 
 ### Step 1: Clone the Repository
