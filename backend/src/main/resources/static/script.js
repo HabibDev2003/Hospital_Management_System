@@ -292,6 +292,38 @@ async function saveDepartmentToAPI(record, isEditing, id) {
 }
 
 
+async function savePatientToAPI(record, isEditing, id) {
+    const patient = {
+        patientId: isEditing ? Number(id) : Number(record.id),
+        fullName: record.name,
+        gender: record.gender,
+        dateOfBirth: record.dob,
+        phoneNumber: record.phone,
+        address: record.address,
+        bloodGroup: record.blood
+    };
+
+    const url = isEditing
+        ? `/api/patients/${id}`
+        : "/api/patients";
+
+    const response = await fetch(url, {
+        method: isEditing ? "PUT" : "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(patient)
+    });
+
+    if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || "Patient operation failed.");
+    }
+
+    return true;
+}
+
+
 
 function save() {
     try {
@@ -826,6 +858,35 @@ async function deleteRecord(bucket, id) {
         return;
     }
 
+
+    if (bucket === "patients") {
+    try {
+        const response = await fetch(`/api/patients/${id}`, {
+            method: "DELETE"
+        });
+
+        if (!response.ok) {
+            throw new Error(
+                await response.text() || "Patient deletion failed."
+            );
+        }
+
+        db.patients = db.patients.filter(
+            item => Number(item.id) !== Number(id)
+        );
+
+        render();
+        toast("Patient deleted successfully.");
+
+    } catch (error) {
+        console.error(error);
+        toast("Patient delete failed: " + error.message);
+    }
+
+    return;
+}
+
+
     const previousData = JSON.stringify(db);
 
     tree.forEach(entry => {
@@ -959,6 +1020,55 @@ $("recordForm").addEventListener("submit", async event => {
         return;
     }
 
+
+    // Save patients directly through Java API to Oracle
+if (key === "patients") {
+    const isEditing = Boolean(editing);
+
+    if (!isEditing) {
+        record.id = Math.max(
+            0,
+            ...db.patients.map(item => Number(item.id) || 0)
+        ) + 1;
+    }
+
+    try {
+        await savePatientToAPI(
+            record,
+            isEditing,
+            editing?.id
+        );
+
+        const response = await fetch("/api/patients");
+
+        if (!response.ok) {
+            throw new Error("Could not refresh patients.");
+        }
+
+        db.patients = (await response.json()).map(item => ({
+            id: item.PATIENT_ID,
+            name: item.FULL_NAME,
+            gender: item.GENDER,
+            dob: String(item.DATE_OF_BIRTH).slice(0, 10),
+            phone: item.PHONE_NUMBER,
+            address: item.ADDRESS,
+            blood: item.BLOOD_GROUP
+        }));
+
+        closeForm();
+        render();
+
+        toast(isEditing
+            ? "Patient updated successfully."
+            : "Patient created successfully.");
+
+    } catch (error) {
+        console.error(error);
+        toast("Patient save failed: " + error.message);
+    }
+
+    return;
+}
 
 
     const previousData = JSON.stringify(db);
