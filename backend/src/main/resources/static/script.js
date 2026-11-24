@@ -257,7 +257,7 @@ async function loadData() {
         }));
 
 
-                // Load doctors directly from Oracle
+        // Load doctors directly from Oracle
         const doctorResponse = await fetch("/api/doctors");
 
         if (!doctorResponse.ok) {
@@ -273,6 +273,22 @@ async function loadData() {
             departmentId: item.departmentId
         }));
 
+
+        // Load appointments directly from Oracle
+        const appointmentResponse = await fetch("/api/appointments");
+
+        if (!appointmentResponse.ok) {
+            throw new Error("Could not load appointments from the server.");
+        }
+
+        db.appointments = (await appointmentResponse.json()).map(item => ({
+            id: item.appointmentId,
+            patientId: item.patientId,
+            doctorId: item.doctorId,
+            date: item.appointmentDate,
+            time: item.appointmentTime,
+            status: item.status
+        }));
 
     } catch (error) {
         console.error("Data loading error:", error);
@@ -368,6 +384,38 @@ async function saveDoctorToAPI(record, isEditing, id) {
     if (!response.ok) {
         const message = await response.text();
         throw new Error(message || "Doctor operation failed.");
+    }
+
+    return true;
+}
+
+
+
+async function saveAppointmentToAPI(record, isEditing, id) {
+    const appointment = {
+        appointmentId: isEditing ? Number(id) : Number(record.id),
+        patientId: Number(record.patientId),
+        doctorId: Number(record.doctorId),
+        appointmentDate: record.date,
+        appointmentTime: record.time,
+        status: record.status
+    };
+
+    const url = isEditing
+        ? `/api/appointments/${id}`
+        : "/api/appointments";
+
+    const response = await fetch(url, {
+        method: isEditing ? "PUT" : "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(appointment)
+    });
+
+    if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || "Appointment operation failed.");
     }
 
     return true;
@@ -967,6 +1015,35 @@ async function deleteRecord(bucket, id) {
     }
 
 
+
+    // Delete appointments directly from Oracle
+    if (bucket === "appointments") {
+        try {
+            const response = await fetch(`/api/appointments/${id}`, {
+                method: "DELETE"
+            });
+
+            if (!response.ok) {
+                throw new Error(
+                    await response.text() || "Appointment deletion failed."
+                );
+            }
+
+            db.appointments = db.appointments.filter(
+                item => Number(item.id) !== Number(id)
+            );
+
+            render();
+            toast("Appointment deleted successfully.");
+
+        } catch (error) {
+            console.error(error);
+            toast("Appointment delete failed: " + error.message);
+        }
+
+        return;
+    }
+
     const previousData = JSON.stringify(db);
 
     tree.forEach(entry => {
@@ -1195,6 +1272,56 @@ if (key === "doctors") {
     } catch (error) {
         console.error(error);
         toast("Doctor save failed: " + error.message);
+    }
+
+    return;
+}
+
+
+
+// Save appointments directly through Java API to Oracle
+if (key === "appointments") {
+    const isEditing = Boolean(editing);
+
+    if (!isEditing) {
+        record.id = Math.max(
+            0,
+            ...db.appointments.map(item => Number(item.id) || 0)
+        ) + 1;
+    }
+
+    try {
+        await saveAppointmentToAPI(
+            record,
+            isEditing,
+            editing?.id
+        );
+
+        const response = await fetch("/api/appointments");
+
+        if (!response.ok) {
+            throw new Error("Could not refresh appointments.");
+        }
+
+        db.appointments = (await response.json()).map(item => ({
+            id: item.appointmentId,
+            patientId: item.patientId,
+            doctorId: item.doctorId,
+            date: item.appointmentDate,
+            time: item.appointmentTime,
+            status: item.status
+        }));
+
+        closeForm();
+        render();
+
+        toast(isEditing
+            ? "Appointment updated successfully."
+            : "Appointment created successfully.");
+
+    } catch (error) {
+        console.error(error);
+        toast("Appointment save failed: " + error.message);
     }
 
     return;
