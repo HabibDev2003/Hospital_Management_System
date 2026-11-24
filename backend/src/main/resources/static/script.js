@@ -213,6 +213,7 @@ const fmt = value =>
     });
 
 
+
 async function loadData() {
     try {
         const saved = JSON.parse(
@@ -225,7 +226,7 @@ async function loadData() {
                 : JSON.parse(JSON.stringify(seed[key] || []));
         });
 
-        // Load departments directly from Oracle through Java API
+        // Load departments directly from Oracle
         const response = await fetch("/api/departments");
 
         if (!response.ok) {
@@ -233,15 +234,33 @@ async function loadData() {
         }
 
         db.departments = (await response.json()).map(item => ({
-        id: item.DEPARTMENT_ID,
-        name: item.DEPARTMENT_NAME,
-        location: item.LOCATION
-    }));
+            id: item.DEPARTMENT_ID,
+            name: item.DEPARTMENT_NAME,
+            location: item.LOCATION
+        }));
+
+        // Load patients directly from Oracle
+        const patientResponse = await fetch("/api/patients");
+
+        if (!patientResponse.ok) {
+            throw new Error("Could not load patients from the server.");
+        }
+
+        db.patients = (await patientResponse.json()).map(item => ({
+            id: item.PATIENT_ID,
+            name: item.FULL_NAME,
+            gender: item.GENDER,
+            dob: String(item.DATE_OF_BIRTH).slice(0, 10),
+            phone: item.PHONE_NUMBER,
+            address: item.ADDRESS,
+            blood: item.BLOOD_GROUP
+        }));
 
     } catch (error) {
         console.error("Data loading error:", error);
     }
 }
+
 
 
 
