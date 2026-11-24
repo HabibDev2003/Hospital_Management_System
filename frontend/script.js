@@ -212,7 +212,9 @@ const fmt = value =>
         maximumFractionDigits: 2
     });
 
-function loadData() {
+
+
+async function loadData() {
     try {
         const saved = JSON.parse(
             localStorage.getItem(storeKey) || "null"
@@ -223,12 +225,203 @@ function loadData() {
                 ? saved[key]
                 : JSON.parse(JSON.stringify(seed[key] || []));
         });
+
+        // Load departments directly from Oracle
+        const response = await fetch("/api/departments");
+
+        if (!response.ok) {
+            throw new Error("Could not load departments from the server.");
+        }
+
+        db.departments = (await response.json()).map(item => ({
+            id: item.DEPARTMENT_ID,
+            name: item.DEPARTMENT_NAME,
+            location: item.LOCATION
+        }));
+
+        // Load patients directly from Oracle
+        const patientResponse = await fetch("/api/patients");
+
+        if (!patientResponse.ok) {
+            throw new Error("Could not load patients from the server.");
+        }
+
+        db.patients = (await patientResponse.json()).map(item => ({
+            id: item.PATIENT_ID,
+            name: item.FULL_NAME,
+            gender: item.GENDER,
+            dob: String(item.DATE_OF_BIRTH).slice(0, 10),
+            phone: item.PHONE_NUMBER,
+            address: item.ADDRESS,
+            blood: item.BLOOD_GROUP
+        }));
+
+
+        // Load doctors directly from Oracle
+        const doctorResponse = await fetch("/api/doctors");
+
+        if (!doctorResponse.ok) {
+            throw new Error("Could not load doctors from the server.");
+        }
+
+        db.doctors = (await doctorResponse.json()).map(item => ({
+            id: item.doctorId,
+            name: item.doctorName,
+            specialty: item.specialization,
+            phone: item.phoneNumber,
+            email: item.email,
+            departmentId: item.departmentId
+        }));
+
+
+        // Load appointments directly from Oracle
+        const appointmentResponse = await fetch("/api/appointments");
+
+        if (!appointmentResponse.ok) {
+            throw new Error("Could not load appointments from the server.");
+        }
+
+        db.appointments = (await appointmentResponse.json()).map(item => ({
+            id: item.appointmentId,
+            patientId: item.patientId,
+            doctorId: item.doctorId,
+            date: item.appointmentDate,
+            time: item.appointmentTime,
+            status: item.status
+        }));
+
     } catch (error) {
-        Object.keys(schema).forEach(key => {
-            db[key] = JSON.parse(JSON.stringify(seed[key] || []));
-        });
+        console.error("Data loading error:", error);
     }
 }
+
+
+
+
+async function saveDepartmentToAPI(record, isEditing, id) {
+    const department = {
+        departmentId: isEditing ? Number(id) : Number(record.id),
+        departmentName: record.name,
+        location: record.location
+    };
+
+    const url = isEditing
+        ? `/api/departments/${id}`
+        : "/api/departments";
+
+    const response = await fetch(url, {
+        method: isEditing ? "PUT" : "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(department)
+    });
+
+    if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || "Department operation failed.");
+    }
+
+    return true;
+}
+
+
+async function savePatientToAPI(record, isEditing, id) {
+    const patient = {
+        patientId: isEditing ? Number(id) : Number(record.id),
+        fullName: record.name,
+        gender: record.gender,
+        dateOfBirth: record.dob,
+        phoneNumber: record.phone,
+        address: record.address,
+        bloodGroup: record.blood
+    };
+
+    const url = isEditing
+        ? `/api/patients/${id}`
+        : "/api/patients";
+
+    const response = await fetch(url, {
+        method: isEditing ? "PUT" : "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(patient)
+    });
+
+    if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || "Patient operation failed.");
+    }
+
+    return true;
+}
+
+
+
+async function saveDoctorToAPI(record, isEditing, id) {
+    const doctor = {
+        doctorId: isEditing ? Number(id) : Number(record.id),
+        doctorName: record.name,
+        specialization: record.specialty,
+        phoneNumber: record.phone,
+        email: record.email,
+        departmentId: Number(record.departmentId)
+    };
+
+    const url = isEditing
+        ? `/api/doctors/${id}`
+        : "/api/doctors";
+
+    const response = await fetch(url, {
+        method: isEditing ? "PUT" : "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(doctor)
+    });
+
+    if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || "Doctor operation failed.");
+    }
+
+    return true;
+}
+
+
+
+async function saveAppointmentToAPI(record, isEditing, id) {
+    const appointment = {
+        appointmentId: isEditing ? Number(id) : Number(record.id),
+        patientId: Number(record.patientId),
+        doctorId: Number(record.doctorId),
+        appointmentDate: record.date,
+        appointmentTime: record.time,
+        status: record.status
+    };
+
+    const url = isEditing
+        ? `/api/appointments/${id}`
+        : "/api/appointments";
+
+    const response = await fetch(url, {
+        method: isEditing ? "PUT" : "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(appointment)
+    });
+
+    if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || "Appointment operation failed.");
+    }
+
+    return true;
+}
+
+
 
 function save() {
     try {
@@ -370,7 +563,7 @@ function rowCells(key, item) {
 
         case "doctors":
             return [
-                person("Dr. " + item.name, item.email),
+                person(item.name, item.email),
                 "DR-" + String(item.id).padStart(3, "0"),
                 esc(item.specialty),
                 esc(refLabel("departments", item.departmentId)),
@@ -378,12 +571,14 @@ function rowCells(key, item) {
                 esc(item.email)
             ];
 
+        
         case "departments":
-            return [
-                "DP-" + String(item.id).padStart(3, "0"),
-                esc(item.name),
-                esc(item.location)
-            ];
+        return [
+            "DP-" + String(item.id).padStart(3, "0"),
+            esc(item.name),
+            esc(item.location)
+        ];
+
 
         case "appointments":
             return [
@@ -720,7 +915,7 @@ function collectDeleteTree(bucket, id, seen = new Set(), result = []) {
     return result;
 }
 
-function deleteRecord(bucket, id) {
+async function deleteRecord(bucket, id) {
     if (!get(bucket, id)) {
         toast("Record not found. Refresh the page and try again.");
         return;
@@ -737,6 +932,117 @@ function deleteRecord(bucket, id) {
           + "? This cannot be undone.";
 
     if (!window.confirm(message)) return;
+
+        if (bucket === "departments") {
+        try {
+            const response = await fetch(`/api/departments/${id}`, {
+                method: "DELETE"
+            });
+
+            if (!response.ok) {
+                throw new Error(await response.text() || "Department deletion failed.");
+            }
+
+            db.departments = db.departments.filter(
+                item => Number(item.id) !== Number(id)
+            );
+
+            render();
+            toast("Department deleted successfully.");
+        } catch (error) {
+            console.error(error);
+            toast("Department delete failed: " + error.message);
+        }
+        return;
+    }
+
+
+    if (bucket === "patients") {
+    try {
+        const response = await fetch(`/api/patients/${id}`, {
+            method: "DELETE"
+        });
+
+        if (!response.ok) {
+            throw new Error(
+                await response.text() || "Patient deletion failed."
+            );
+        }
+
+        db.patients = db.patients.filter(
+            item => Number(item.id) !== Number(id)
+        );
+
+        render();
+        toast("Patient deleted successfully.");
+
+    } catch (error) {
+        console.error(error);
+        toast("Patient delete failed: " + error.message);
+    }
+
+    return;
+}
+
+
+
+    // Delete doctors directly from Oracle
+    if (bucket === "doctors") {
+        try {
+            const response = await fetch(`/api/doctors/${id}`, {
+                method: "DELETE"
+            });
+
+            if (!response.ok) {
+                throw new Error(
+                    await response.text() || "Doctor deletion failed."
+                );
+            }
+
+            db.doctors = db.doctors.filter(
+                item => Number(item.id) !== Number(id)
+            );
+
+            render();
+            toast("Doctor deleted successfully.");
+
+        } catch (error) {
+            console.error(error);
+            toast("Doctor delete failed: " + error.message);
+        }
+
+        return;
+    }
+
+
+
+    // Delete appointments directly from Oracle
+    if (bucket === "appointments") {
+        try {
+            const response = await fetch(`/api/appointments/${id}`, {
+                method: "DELETE"
+            });
+
+            if (!response.ok) {
+                throw new Error(
+                    await response.text() || "Appointment deletion failed."
+                );
+            }
+
+            db.appointments = db.appointments.filter(
+                item => Number(item.id) !== Number(id)
+            );
+
+            render();
+            toast("Appointment deleted successfully.");
+
+        } catch (error) {
+            console.error(error);
+            toast("Appointment delete failed: " + error.message);
+        }
+
+        return;
+    }
 
     const previousData = JSON.stringify(db);
 
@@ -759,7 +1065,7 @@ function deleteRecord(bucket, id) {
         : "Record deleted successfully.");
 }
 
-$("recordForm").addEventListener("submit", event => {
+$("recordForm").addEventListener("submit", async event => {
     event.preventDefault();
 
     const key = editing?.key || currentPage;
@@ -822,6 +1128,206 @@ $("recordForm").addEventListener("submit", event => {
         return;
     }
 
+
+
+    // Save departments directly through Java API to Oracle
+    if (key === "departments") {
+        const isEditing = Boolean(editing);
+
+        if (!isEditing) {
+            record.id = Math.max(
+                0,
+                ...db.departments.map(item =>
+                    Number(item.id) || 0
+                )
+            ) + 1;
+        }
+
+        try {
+            await saveDepartmentToAPI(
+                record,
+                isEditing,
+                editing?.id
+            );
+
+            const response = await fetch("/api/departments");
+
+            if (!response.ok) {
+                throw new Error("Could not refresh departments.");
+            }
+
+            db.departments = (await response.json()).map(item => ({
+            id: item.DEPARTMENT_ID,
+            name: item.DEPARTMENT_NAME,
+            location: item.LOCATION
+            }));
+
+            closeForm();
+            render();
+
+            toast(isEditing
+                ? "Department updated successfully."
+                : "Department created successfully.");
+
+        } catch (error) {
+            console.error(error);
+            toast("Department save failed: " + error.message);
+        }
+
+        return;
+    }
+
+
+    // Save patients directly through Java API to Oracle
+if (key === "patients") {
+    const isEditing = Boolean(editing);
+
+    if (!isEditing) {
+        record.id = Math.max(
+            0,
+            ...db.patients.map(item => Number(item.id) || 0)
+        ) + 1;
+    }
+
+    try {
+        await savePatientToAPI(
+            record,
+            isEditing,
+            editing?.id
+        );
+
+        const response = await fetch("/api/patients");
+
+        if (!response.ok) {
+            throw new Error("Could not refresh patients.");
+        }
+
+        db.patients = (await response.json()).map(item => ({
+            id: item.PATIENT_ID,
+            name: item.FULL_NAME,
+            gender: item.GENDER,
+            dob: String(item.DATE_OF_BIRTH).slice(0, 10),
+            phone: item.PHONE_NUMBER,
+            address: item.ADDRESS,
+            blood: item.BLOOD_GROUP
+        }));
+
+        closeForm();
+        render();
+
+        toast(isEditing
+            ? "Patient updated successfully."
+            : "Patient created successfully.");
+
+    } catch (error) {
+        console.error(error);
+        toast("Patient save failed: " + error.message);
+    }
+
+    return;
+}
+
+
+
+// Save doctors directly through Java API to Oracle
+if (key === "doctors") {
+    const isEditing = Boolean(editing);
+
+    if (!isEditing) {
+        record.id = Math.max(
+            0,
+            ...db.doctors.map(item => Number(item.id) || 0)
+        ) + 1;
+    }
+
+    try {
+        await saveDoctorToAPI(
+            record,
+            isEditing,
+            editing?.id
+        );
+
+        const response = await fetch("/api/doctors");
+
+        if (!response.ok) {
+            throw new Error("Could not refresh doctors.");
+        }
+
+        db.doctors = (await response.json()).map(item => ({
+            id: item.doctorId,
+            name: item.doctorName,
+            specialty: item.specialization,
+            phone: item.phoneNumber,
+            email: item.email,
+            departmentId: item.departmentId
+        }));
+
+        closeForm();
+        render();
+
+        toast(isEditing
+            ? "Doctor updated successfully."
+            : "Doctor created successfully.");
+
+    } catch (error) {
+        console.error(error);
+        toast("Doctor save failed: " + error.message);
+    }
+
+    return;
+}
+
+
+
+// Save appointments directly through Java API to Oracle
+if (key === "appointments") {
+    const isEditing = Boolean(editing);
+
+    if (!isEditing) {
+        record.id = Math.max(
+            0,
+            ...db.appointments.map(item => Number(item.id) || 0)
+        ) + 1;
+    }
+
+    try {
+        await saveAppointmentToAPI(
+            record,
+            isEditing,
+            editing?.id
+        );
+
+        const response = await fetch("/api/appointments");
+
+        if (!response.ok) {
+            throw new Error("Could not refresh appointments.");
+        }
+
+        db.appointments = (await response.json()).map(item => ({
+            id: item.appointmentId,
+            patientId: item.patientId,
+            doctorId: item.doctorId,
+            date: item.appointmentDate,
+            time: item.appointmentTime,
+            status: item.status
+        }));
+
+        closeForm();
+        render();
+
+        toast(isEditing
+            ? "Appointment updated successfully."
+            : "Appointment created successfully.");
+
+    } catch (error) {
+        console.error(error);
+        toast("Appointment save failed: " + error.message);
+    }
+
+    return;
+}
+
+
     const previousData = JSON.stringify(db);
 
     if (editing) {
@@ -859,17 +1365,19 @@ $("modal").addEventListener("click", event => {
    Browser-only demo authentication; production requires a
    trusted server, database, HTTPS and server-side sessions.
    ========================================================= */
-const authUsersKey = "novax_auth_users_v1";
-const authSessionKey = "novax_auth_session_v1";
 
-function readAuthUsers() {
-    try {
-        const users = JSON.parse(localStorage.getItem(authUsersKey) || "[]");
-        return Array.isArray(users) ? users : [];
-    } catch (error) {
-        return [];
-    }
-}
+/* =========================================================
+   NovaX Authentication
+   Oracle-based staff login
+   ========================================================= */
+
+
+/* =========================================================
+   NovaX Authentication
+   Oracle-based staff login and registration
+   ========================================================= */
+
+const authSessionKey = "novax_auth_session_v1";
 
 function showAuthMessage(message, type = "error") {
     const box = $("authMessage");
@@ -877,83 +1385,51 @@ function showAuthMessage(message, type = "error") {
     box.className = "auth-message " + type;
 }
 
-function setAuthMode(mode) {
-    const registering = mode === "register";
-    $("loginForm").hidden = registering;
-    $("registerForm").hidden = !registering;
-    $("loginTab").classList.toggle("active", !registering);
-    $("registerTab").classList.toggle("active", registering);
-    $("authTitle").textContent = registering ? "Create your account" : "Welcome back";
-    $("authSubtitle").textContent = registering
-        ? "Set up your personal access to the NovaX workspace."
-        : "Sign in to continue to your hospital workspace.";
+// Switch between Sign In and Create Account
+function setAuthMode(mode = "login") {
+    const isLogin = mode === "login";
+
+    $("loginForm").hidden = !isLogin;
+    $("registerForm").hidden = isLogin;
+
+    $("loginTab").classList.toggle("active", isLogin);
+    $("registerTab").classList.toggle("active", !isLogin);
+
+    $("authTitle").textContent =
+        isLogin ? "Welcome back" : "Create your account";
+
+    $("authSubtitle").textContent = isLogin
+        ? "Sign in to continue to your hospital workspace."
+        : "Register your staff account to access NovaX.";
+
     showAuthMessage("");
 }
 
-function bytesToBase64(bytes) {
-    return btoa(String.fromCharCode(...new Uint8Array(bytes)));
-}
 
-function base64ToBytes(value) {
-    return Uint8Array.from(atob(value), char => char.charCodeAt(0));
-}
-
-async function derivePasswordHash(password, salt) {
-    if (!window.crypto || !window.crypto.subtle) {
-        throw new Error("Secure password processing is unavailable. Open this project through localhost or HTTPS (for example, VS Code Live Server).");
-    }
-
-    const encoder = new TextEncoder();
-    const key = await crypto.subtle.importKey(
-        "raw", encoder.encode(password), "PBKDF2", false, ["deriveBits"]
-    );
-    const bits = await crypto.subtle.deriveBits({
-        name: "PBKDF2",
-        salt,
-        iterations: 210000,
-        hash: "SHA-256"
-    }, key, 256);
-
-    return bytesToBase64(bits);
-}
-
-function createSalt() {
-    const salt = new Uint8Array(16);
-    crypto.getRandomValues(salt);
-    return salt;
-}
-
-function startAuthenticatedSession(user) {
-    sessionStorage.setItem(authSessionKey, JSON.stringify({
-        id: user.id,
-        name: user.name,
-        email: user.email
-    }));
+async function startAuthenticatedSession(user) {
+    sessionStorage.setItem(authSessionKey, JSON.stringify(user));
 
     $("authScreen").classList.add("auth-hidden");
     $("mainApp").classList.remove("app-locked");
+
     updateUserAvatar(user);
     populateProfile(user);
-    showAuthMessage("");
 
     if (!window.novaxAppInitialized) {
-        loadData();
+        window.novaxAppInitialized = true;
+
+        await loadData();
         buildPages();
         render();
-        window.novaxAppInitialized = true;
     }
 }
 
-// ---------------------------------------------------------
-// MY PROFILE: picture, name and email for the signed-in user
-// ---------------------------------------------------------
-let pendingProfilePhoto = undefined;
 
 function getCurrentAuthUser() {
     try {
-        const session = JSON.parse(sessionStorage.getItem(authSessionKey) || "null");
-        if (!session) return null;
-        return readAuthUsers().find(account => account.id === session.id) || null;
+        return JSON.parse(
+            sessionStorage.getItem(authSessionKey) || "null"
+        );
     } catch (error) {
         return null;
     }
@@ -962,225 +1438,163 @@ function getCurrentAuthUser() {
 function updateUserAvatar(user) {
     const avatar = $("userAvatar");
     if (!avatar) return;
+
     avatar.replaceChildren();
-    if (user.profilePhoto) {
-        const image = document.createElement("img");
-        image.src = user.profilePhoto;
-        image.alt = "Profile picture";
-        avatar.appendChild(image);
-        avatar.classList.add("has-photo");
-    } else {
-        avatar.textContent = initials(user.name);
-        avatar.classList.remove("has-photo");
-    }
-    avatar.title = user.name + " · " + user.email + " · Open profile";
-    avatar.setAttribute("aria-label", "Open profile for " + user.name);
+    avatar.textContent = initials(user.fullName || user.username);
+
+    avatar.title = user.username + " · " + user.role;
+    avatar.setAttribute(
+        "aria-label",
+        "Open profile for " + user.username
+    );
 }
 
 function populateProfile(user) {
     if (!user) return;
-    $("profileName").value = user.name || "";
+
+    $("profileName").value =
+        user.fullName || user.username || "";
+
     $("profileEmail").value = user.email || "";
-    $("profileCreatedAt").textContent = user.createdAt
-        ? new Date(user.createdAt).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
-        : "Not available";
-    $("profileAccountId").textContent = String(user.id || "—").slice(0, 18);
-    renderProfilePhoto(user.profilePhoto || null, user.name);
-    pendingProfilePhoto = undefined;
-    $("profilePhotoInput").value = "";
-    $("profileSaveMessage").textContent = "";
+    $("profileEmail").readOnly = true;
+
+    $("profileCreatedAt").textContent = "Oracle staff account";
+    $("profileAccountId").textContent = String(user.userId || "—");
+
+    renderProfilePhoto(null, user.fullName || user.username);
+
+    $("profileSaveMessage").textContent =
+        "Your account information is managed by the hospital administrator.";
 }
 
 function renderProfilePhoto(photo, name) {
     const preview = $("profilePhotoPreview");
+    if (!preview) return;
+
     preview.replaceChildren();
+
     if (photo) {
         const image = document.createElement("img");
         image.src = photo;
-        image.alt = "Your profile picture";
+        image.alt = "Profile picture";
         preview.appendChild(image);
     } else {
         preview.textContent = initials(name || "NX");
     }
 }
 
-function resizeProfileImage(file) {
-    return new Promise((resolve, reject) => {
-        if (!file.type.match(/^image\/(jpeg|png|webp)$/)) {
-            reject(new Error("Choose a JPG, PNG or WEBP image."));
-            return;
-        }
-        if (file.size > 5 * 1024 * 1024) {
-            reject(new Error("The image must be smaller than 5 MB."));
-            return;
-        }
-        const reader = new FileReader();
-        reader.onerror = () => reject(new Error("Could not read that image."));
-        reader.onload = () => {
-            const image = new Image();
-            image.onerror = () => reject(new Error("That image could not be opened."));
-            image.onload = () => {
-                const maxSide = 512;
-                const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
-                const canvas = document.createElement("canvas");
-                canvas.width = Math.max(1, Math.round(image.width * scale));
-                canvas.height = Math.max(1, Math.round(image.height * scale));
-                const context = canvas.getContext("2d");
-                context.drawImage(image, 0, 0, canvas.width, canvas.height);
-                resolve(canvas.toDataURL("image/jpeg", 0.84));
-            };
-            image.src = reader.result;
-        };
-        reader.readAsDataURL(file);
-    });
+function endAuthenticatedSession() {
+    sessionStorage.removeItem(authSessionKey);
+
+    $("mainApp").classList.add("app-locked");
+    $("authScreen").classList.remove("auth-hidden");
+
+    $("loginForm").reset();
+    $("registerForm").reset();
+
+    setAuthMode("login");
 }
 
 $("userAvatar").addEventListener("click", () => go("profile"));
 
-$("profilePhotoInput").addEventListener("change", async event => {
-    const file = event.target.files && event.target.files[0];
-    if (!file) return;
-    try {
-        pendingProfilePhoto = await resizeProfileImage(file);
-        renderProfilePhoto(pendingProfilePhoto, $("profileName").value);
-        $("profileSaveMessage").textContent = "Photo selected. Save profile changes to keep it.";
-    } catch (error) {
-        event.target.value = "";
-        $("profileSaveMessage").textContent = error.message;
-    }
-});
-
-$("removeProfilePhoto").addEventListener("click", () => {
-    pendingProfilePhoto = "";
-    renderProfilePhoto(null, $("profileName").value);
-    $("profilePhotoInput").value = "";
-    $("profileSaveMessage").textContent = "Photo will be removed when you save.";
-});
-
-$("profileName").addEventListener("input", () => {
-    if (pendingProfilePhoto === undefined) {
-        const current = getCurrentAuthUser();
-        renderProfilePhoto(current && current.profilePhoto ? current.profilePhoto : null, $("profileName").value);
-    } else if (pendingProfilePhoto === "") {
-        renderProfilePhoto(null, $("profileName").value);
-    }
-});
-
 $("profileForm").addEventListener("submit", event => {
     event.preventDefault();
-    const current = getCurrentAuthUser();
-    if (!current) return;
 
-    const name = $("profileName").value.trim();
-    const email = $("profileEmail").value.trim().toLowerCase();
-    if (name.length < 2) {
-        $("profileSaveMessage").textContent = "Please enter your full name.";
-        return;
-    }
-    if (!email) {
-        $("profileSaveMessage").textContent = "Please enter a valid email address.";
-        return;
-    }
-
-    const users = readAuthUsers();
-    if (users.some(account => account.id !== current.id && account.email === email)) {
-        $("profileSaveMessage").textContent = "That email address is already used by another account.";
-        return;
-    }
-
-    const user = users.find(account => account.id === current.id);
-    if (!user) return;
-    user.name = name;
-    user.email = email;
-    if (pendingProfilePhoto !== undefined) {
-        if (pendingProfilePhoto) user.profilePhoto = pendingProfilePhoto;
-        else delete user.profilePhoto;
-    }
-
-    try {
-        localStorage.setItem(authUsersKey, JSON.stringify(users));
-        sessionStorage.setItem(authSessionKey, JSON.stringify({
-            id: user.id, name: user.name, email: user.email
-        }));
-        updateUserAvatar(user);
-        populateProfile(user);
-        $("profileSaveMessage").textContent = "Profile updated successfully.";
-        toast("Your profile has been updated.");
-    } catch (error) {
-        $("profileSaveMessage").textContent = "Could not save. Browser storage may be full.";
-    }
+    $("profileSaveMessage").textContent =
+        "Profile changes must be managed by the hospital administrator.";
 });
 
-function endAuthenticatedSession() {
-    sessionStorage.removeItem(authSessionKey);
-    $("mainApp").classList.add("app-locked");
-    $("authScreen").classList.remove("auth-hidden");
-    $("loginForm").reset();
-    $("registerForm").reset();
-    setAuthMode("login");
-}
+$("profilePhotoInput").disabled = true;
+$("removeProfilePhoto").disabled = true;
 
+// Authentication tabs
 $("loginTab").addEventListener("click", () => setAuthMode("login"));
 $("registerTab").addEventListener("click", () => setAuthMode("register"));
 
+// Links below the forms
 document.querySelectorAll("[data-switch-auth]").forEach(button => {
-    button.addEventListener("click", () => setAuthMode(button.dataset.switchAuth));
+    button.hidden = false;
+
+    button.addEventListener("click", () => {
+        setAuthMode(button.dataset.switchAuth);
+    });
 });
 
-document.querySelectorAll("[data-auth-mode]").forEach(button => {
-    button.addEventListener("click", () => setAuthMode(button.dataset.authMode));
-});
-
+// Show/hide password buttons
 document.querySelectorAll("[data-toggle-password]").forEach(button => {
     button.addEventListener("click", () => {
         const input = $(button.dataset.togglePassword);
-        input.type = input.type === "password" ? "text" : "password";
-        button.setAttribute("aria-label", input.type === "password" ? "Show password" : "Hide password");
+
+        input.type =
+            input.type === "password" ? "text" : "password";
+
+        button.setAttribute(
+            "aria-label",
+            input.type === "password" ? "Show password" : "Hide password"
+        );
     });
 });
+
+// =========================
+// ORACLE STAFF REGISTRATION
+// =========================
 
 $("registerForm").addEventListener("submit", async event => {
     event.preventDefault();
 
-    const name = $("registerName").value.trim();
-    const email = $("registerEmail").value.trim().toLowerCase();
+    const fullName = $("registerName").value.trim();
+    const username = $("registerUsername").value.trim();
+    const email = $("registerEmail").value.trim();
     const password = $("registerPassword").value;
-    const confirm = $("registerConfirm").value;
+    const confirmPassword = $("registerConfirm").value;
 
-    if (name.length < 2) return showAuthMessage("Please enter your full name.");
-    if (password.length < 8) return showAuthMessage("Your password must contain at least 8 characters.");
-    if (password !== confirm) return showAuthMessage("The passwords do not match.");
-
-    const users = readAuthUsers();
-    if (users.some(user => user.email === email)) {
-        return showAuthMessage("An account with this email already exists. Please sign in.");
+    if (password !== confirmPassword) {
+        showAuthMessage("Passwords do not match.");
+        return;
     }
 
     const submit = event.submitter;
+
     if (submit) {
         submit.disabled = true;
         submit.classList.add("is-loading");
     }
 
     try {
-        const salt = createSalt();
-        const passwordHash = await derivePasswordHash(password, salt);
-        const user = {
-            id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
-            name,
-            email,
-            salt: bytesToBase64(salt),
-            passwordHash,
-            createdAt: new Date().toISOString()
-        };
+        const response = await fetch("/api/auth/register", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                fullName,
+                username,
+                email,
+                password,
+                confirmPassword
+            })
+        });
 
-        users.push(user);
-        localStorage.setItem(authUsersKey, JSON.stringify(users));
-        startAuthenticatedSession(user);
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(
+                result.detail || result.message ||
+                "Registration failed."
+            );
+        }
+
+        // Automatically sign in the newly registered staff member.
+        startAuthenticatedSession(result);
+
         event.target.reset();
-        toast("Your NovaX account has been created.");
+
+        toast("Welcome to NovaX, " + result.fullName + "!");
+
     } catch (error) {
-        showAuthMessage(error.message || "Could not create your account. Please try again.");
+        showAuthMessage(
+            error.message || "Could not connect to the hospital server."
+        );
     } finally {
         if (submit) {
             submit.disabled = false;
@@ -1188,33 +1602,55 @@ $("registerForm").addEventListener("submit", async event => {
         }
     }
 });
+
+// =========================
+// ORACLE STAFF LOGIN
+// =========================
 
 $("loginForm").addEventListener("submit", async event => {
     event.preventDefault();
 
-    const email = $("loginEmail").value.trim().toLowerCase();
+    const username = $("loginUsername").value.trim();
     const password = $("loginPassword").value;
-    const user = readAuthUsers().find(account => account.email === email);
-
-    if (!user) return showAuthMessage("No account was found for this email. Create an account first.");
 
     const submit = event.submitter;
+
     if (submit) {
         submit.disabled = true;
         submit.classList.add("is-loading");
     }
 
     try {
-        const hash = await derivePasswordHash(password, base64ToBytes(user.salt));
-        if (hash !== user.passwordHash) {
-            return showAuthMessage("Incorrect password. Please try again.");
+        const response = await fetch("/api/auth/login", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                username,
+                password
+            })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(
+                result.detail || result.message ||
+                "Invalid username or password."
+            );
         }
 
-        startAuthenticatedSession(user);
+        startAuthenticatedSession(result);
+
         event.target.reset();
-        toast("Welcome back, " + user.name + ".");
+
+        toast("Welcome, " + result.username + "!");
+
     } catch (error) {
-        showAuthMessage(error.message || "Sign in failed. Please try again.");
+        showAuthMessage(
+            error.message || "Could not connect to the hospital server."
+        );
     } finally {
         if (submit) {
             submit.disabled = false;
@@ -1223,28 +1659,24 @@ $("loginForm").addEventListener("submit", async event => {
     }
 });
 
+// Logout
 $("logoutButton").addEventListener("click", () => {
     endAuthenticatedSession();
     toast("You have been signed out.");
 });
 
+// Restore an existing browser session
 function restoreAuthSession() {
-    try {
-        const session = JSON.parse(sessionStorage.getItem(authSessionKey) || "null");
-        const user = session && readAuthUsers().find(account =>
-            account.id === session.id && account.email === session.email
-        );
+    const user = getCurrentAuthUser();
 
-        if (user) {
-            startAuthenticatedSession(user);
-            return true;
-        }
-    } catch (error) {
-        // Invalid or expired browser session: show the sign-in screen.
+    if (user && user.userId && user.username) {
+        startAuthenticatedSession(user);
+        return true;
     }
 
     $("mainApp").classList.add("app-locked");
     $("authScreen").classList.remove("auth-hidden");
+
     return false;
 }
 

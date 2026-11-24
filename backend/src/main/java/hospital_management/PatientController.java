@@ -88,20 +88,45 @@ public class PatientController {
     }
 
     // DELETE: Remove a patient
-    @DeleteMapping("/{id}")
-    public String deletePatient(@PathVariable int id) {
-        int rows = jdbcTemplate.update(
-            "DELETE FROM Patient WHERE Patient_ID = ?", id
+    
+@DeleteMapping("/{id}")
+public String deletePatient(@PathVariable int id) {
+
+    Integer appointmentCount = jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM Appointment WHERE Patient_ID = ?",
+        Integer.class, id
+    );
+
+    Integer prescriptionCount = jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM Prescription WHERE Patient_ID = ?",
+        Integer.class, id
+    );
+
+    Integer paymentCount = jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM Payment WHERE Patient_ID = ?",
+        Integer.class, id
+    );
+
+    if (appointmentCount > 0 || prescriptionCount > 0 || paymentCount > 0) {
+        throw new ResponseStatusException(
+            HttpStatus.CONFLICT,
+            "Cannot delete patient because related records exist."
         );
-
-        if (rows == 0) {
-            throw new ResponseStatusException(
-                HttpStatus.NOT_FOUND, "Patient not found"
-            );
-        }
-
-        return "Patient deleted successfully";
     }
+
+    int rows = jdbcTemplate.update(
+        "DELETE FROM Patient WHERE Patient_ID = ?", id
+    );
+
+    if (rows == 0) {
+        throw new ResponseStatusException(
+            HttpStatus.NOT_FOUND, "Patient not found"
+        );
+    }
+
+    return "Patient deleted successfully";
+}
+
 
     // Request data structure
     public record PatientRequest(

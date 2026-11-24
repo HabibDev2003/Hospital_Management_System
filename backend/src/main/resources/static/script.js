@@ -290,6 +290,22 @@ async function loadData() {
             status: item.status
         }));
 
+
+
+        // Load prescriptions directly from Oracle
+        const prescriptionResponse = await fetch("/api/prescriptions");
+
+        if (!prescriptionResponse.ok) {
+            throw new Error("Could not load prescriptions from the server.");
+        }
+
+        db.prescriptions = (await prescriptionResponse.json()).map(item => ({
+            id: item.prescriptionId,
+            patientId: item.patientId,
+            doctorId: item.doctorId,
+            date: String(item.prescriptionDate).slice(0, 10)
+        }));
+
     } catch (error) {
         console.error("Data loading error:", error);
     }
@@ -421,6 +437,34 @@ async function saveAppointmentToAPI(record, isEditing, id) {
     return true;
 }
 
+
+async function savePrescriptionToAPI(record, isEditing, id) {
+    const prescription = {
+        prescriptionId: isEditing ? Number(id) : Number(record.id),
+        patientId: Number(record.patientId),
+        doctorId: Number(record.doctorId),
+        prescriptionDate: record.date
+    };
+
+    const url = isEditing
+        ? `/api/prescriptions/${id}`
+        : "/api/prescriptions";
+
+    const response = await fetch(url, {
+        method: isEditing ? "PUT" : "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(prescription)
+    });
+
+    if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || "Prescription operation failed.");
+    }
+
+    return true;
+}
 
 
 function save() {
@@ -921,7 +965,10 @@ async function deleteRecord(bucket, id) {
         return;
     }
 
-    const tree = collectDeleteTree(bucket, id);
+    const tree = bucket === "prescriptions"
+    ? [{ bucket, id: Number(id) }]
+    : collectDeleteTree(bucket, id);
+
     const linkedCount = tree.length - 1;
 
     const message = linkedCount
@@ -1043,6 +1090,35 @@ async function deleteRecord(bucket, id) {
 
         return;
     }
+
+
+    // Delete prescriptions directly from Oracle
+if (bucket === "prescriptions") {
+    try {
+        const response = await fetch(`/api/prescriptions/${id}`, {
+            method: "DELETE"
+        });
+
+        if (!response.ok) {
+            throw new Error(
+                await response.text() || "Prescription deletion failed."
+            );
+        }
+
+        db.prescriptions = db.prescriptions.filter(
+            item => Number(item.id) !== Number(id)
+        );
+
+        render();
+        toast("Prescription deleted successfully.");
+
+    } catch (error) {
+        console.error(error);
+        toast("Prescription delete failed: " + error.message);
+    }
+
+    return;
+}
 
     const previousData = JSON.stringify(db);
 
@@ -1322,6 +1398,53 @@ if (key === "appointments") {
     } catch (error) {
         console.error(error);
         toast("Appointment save failed: " + error.message);
+    }
+
+    return;
+}
+
+
+// Save prescriptions directly through Java API to Oracle
+if (key === "prescriptions") {
+    const isEditing = Boolean(editing);
+
+    if (!isEditing) {
+        record.id = Math.max(
+            0,
+            ...db.prescriptions.map(item => Number(item.id) || 0)
+        ) + 1;
+    }
+
+    try {
+        await savePrescriptionToAPI(
+            record,
+            isEditing,
+            editing?.id
+        );
+
+        const response = await fetch("/api/prescriptions");
+
+        if (!response.ok) {
+            throw new Error("Could not refresh prescriptions.");
+        }
+
+        db.prescriptions = (await response.json()).map(item => ({
+            id: item.prescriptionId,
+            patientId: item.patientId,
+            doctorId: item.doctorId,
+            date: String(item.prescriptionDate).slice(0, 10)
+        }));
+
+        closeForm();
+        render();
+
+        toast(isEditing
+            ? "Prescription updated successfully."
+            : "Prescription created successfully.");
+
+    } catch (error) {
+        console.error(error);
+        toast("Prescription save failed: " + error.message);
     }
 
     return;

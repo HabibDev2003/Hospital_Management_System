@@ -94,20 +94,38 @@ public class DoctorController {
     }
 
     // DELETE doctor
-    @DeleteMapping("/{id}")
-    public String deleteDoctor(@PathVariable int id) {
-        int rows = jdbc.update(
-            "DELETE FROM Doctor WHERE Doctor_ID = ?",
-            id
+@DeleteMapping("/{id}")
+public String deleteDoctor(@PathVariable int id) {
+
+    Integer appointmentCount = jdbc.queryForObject(
+        "SELECT COUNT(*) FROM Appointment WHERE Doctor_ID = ?",
+        Integer.class, id
+    );
+
+    Integer prescriptionCount = jdbc.queryForObject(
+        "SELECT COUNT(*) FROM Prescription WHERE Doctor_ID = ?",
+        Integer.class, id
+    );
+
+    if (appointmentCount > 0 || prescriptionCount > 0) {
+        throw new ResponseStatusException(
+            HttpStatus.CONFLICT,
+            "Cannot delete doctor. This doctor has appointments or prescriptions."
         );
-
-        if (rows == 0) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Doctor not found");
-        }
-
-        return "Doctor deleted successfully";
     }
 
+    int rows = jdbc.update(
+        "DELETE FROM Doctor WHERE Doctor_ID = ?", id
+    );
+
+    if (rows == 0) {
+        throw new ResponseStatusException(
+            HttpStatus.NOT_FOUND, "Doctor not found"
+        );
+    }
+
+    return "Doctor deleted successfully";
+}
     // Doctor response
     public record Doctor(
         int doctorId,

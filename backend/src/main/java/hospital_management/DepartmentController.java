@@ -80,20 +80,35 @@ public class DepartmentController {
     }
 
     // DELETE: Remove a department
-    @DeleteMapping("/{id}")
-    public String deleteDepartment(@PathVariable int id) {
-        int rows = jdbcTemplate.update(
-            "DELETE FROM Department WHERE Department_ID = ?", id
+   @DeleteMapping("/{id}")
+public String deleteDepartment(@PathVariable int id) {
+
+    Integer doctorCount = jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM Doctor WHERE Department_ID = ?",
+        Integer.class,
+        id
+    );
+
+    if (doctorCount != null && doctorCount > 0) {
+        throw new ResponseStatusException(
+            HttpStatus.CONFLICT,
+            "Cannot delete department. " + doctorCount
+            + " doctor(s) are assigned to this department."
         );
-
-        if (rows == 0) {
-            throw new ResponseStatusException(
-                HttpStatus.NOT_FOUND, "Department not found"
-            );
-        }
-
-        return "Department deleted successfully";
     }
+
+    int rows = jdbcTemplate.update(
+        "DELETE FROM Department WHERE Department_ID = ?", id
+    );
+
+    if (rows == 0) {
+        throw new ResponseStatusException(
+            HttpStatus.NOT_FOUND, "Department not found"
+        );
+    }
+
+    return "Department deleted successfully";
+}
 
     // Request data structure
     public record DepartmentRequest(
