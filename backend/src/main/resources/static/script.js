@@ -306,6 +306,24 @@ async function loadData() {
             date: String(item.prescriptionDate).slice(0, 10)
         }));
 
+
+
+        // Load medicines directly from Oracle
+        const medicineResponse = await fetch("/api/medicines");
+
+        if (!medicineResponse.ok) {
+            throw new Error("Could not load medicines from the server.");
+        }
+
+        db.medicines = (await medicineResponse.json()).map(item => ({
+            id: item.medicineId,
+            name: item.medicineName,
+            quantity: item.quantity,
+            price: item.unitPrice,
+            expiry: String(item.expiryDate).slice(0, 10)
+        }));
+
+
     } catch (error) {
         console.error("Data loading error:", error);
     }
@@ -465,6 +483,38 @@ async function savePrescriptionToAPI(record, isEditing, id) {
 
     return true;
 }
+
+
+
+async function saveMedicineToAPI(record, isEditing, id) {
+    const medicine = {
+        medicineId: isEditing ? Number(id) : Number(record.id),
+        medicineName: record.name,
+        quantity: Number(record.quantity),
+        unitPrice: Number(record.price),
+        expiryDate: record.expiry
+    };
+
+    const url = isEditing
+        ? `/api/medicines/${id}`
+        : "/api/medicines";
+
+    const response = await fetch(url, {
+        method: isEditing ? "PUT" : "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(medicine)
+    });
+
+    if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || "Medicine operation failed.");
+    }
+
+    return true;
+}
+
 
 
 function save() {
@@ -1445,6 +1495,54 @@ if (key === "prescriptions") {
     } catch (error) {
         console.error(error);
         toast("Prescription save failed: " + error.message);
+    }
+
+    return;
+}
+
+
+// Save medicines directly through Java API to Oracle
+if (key === "medicines") {
+    const isEditing = Boolean(editing);
+
+    if (!isEditing) {
+        record.id = Math.max(
+            0,
+            ...db.medicines.map(item => Number(item.id) || 0)
+        ) + 1;
+    }
+
+    try {
+        await saveMedicineToAPI(
+            record,
+            isEditing,
+            editing?.id
+        );
+
+        const response = await fetch("/api/medicines");
+
+        if (!response.ok) {
+            throw new Error("Could not refresh medicines.");
+        }
+
+        db.medicines = (await response.json()).map(item => ({
+            id: item.medicineId,
+            name: item.medicineName,
+            quantity: item.quantity,
+            price: item.unitPrice,
+            expiry: String(item.expiryDate).slice(0, 10)
+        }));
+
+        closeForm();
+        render();
+
+        toast(isEditing
+            ? "Medicine updated successfully."
+            : "Medicine created successfully.");
+
+    } catch (error) {
+        console.error(error);
+        toast("Medicine save failed: " + error.message);
     }
 
     return;
