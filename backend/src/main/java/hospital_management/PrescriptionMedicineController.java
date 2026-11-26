@@ -23,10 +23,14 @@ public class PrescriptionMedicineController {
     @GetMapping
     public List<PrescriptionMedicine> getAll() {
         return jdbc.query(
-            "SELECT Prescription_ID, Medicine_ID FROM Prescription_Medicine ORDER BY Prescription_ID, Medicine_ID",
+            "SELECT Prescription_ID, Medicine_ID, Quantity, Instructions " +
+            "FROM Prescription_Medicine " +
+            "ORDER BY Prescription_ID, Medicine_ID",
             (rs, rowNum) -> new PrescriptionMedicine(
                 rs.getInt("PRESCRIPTION_ID"),
-                rs.getInt("MEDICINE_ID")
+                rs.getInt("MEDICINE_ID"),
+                rs.getInt("QUANTITY"),
+                rs.getString("INSTRUCTIONS")
             )
         );
     }
@@ -38,10 +42,14 @@ public class PrescriptionMedicineController {
         @PathVariable int medicineId
     ) {
         List<PrescriptionMedicine> records = jdbc.query(
-            "SELECT Prescription_ID, Medicine_ID FROM Prescription_Medicine WHERE Prescription_ID = ? AND Medicine_ID = ?",
+            "SELECT Prescription_ID, Medicine_ID, Quantity, Instructions " +
+            "FROM Prescription_Medicine " +
+            "WHERE Prescription_ID = ? AND Medicine_ID = ?",
             (rs, rowNum) -> new PrescriptionMedicine(
                 rs.getInt("PRESCRIPTION_ID"),
-                rs.getInt("MEDICINE_ID")
+                rs.getInt("MEDICINE_ID"),
+                rs.getInt("QUANTITY"),
+                rs.getString("INSTRUCTIONS")
             ),
             prescriptionId,
             medicineId
@@ -60,15 +68,19 @@ public class PrescriptionMedicineController {
     @PostMapping
     public String add(@RequestBody PrescriptionMedicineRequest record) {
         jdbc.update(
-            "INSERT INTO Prescription_Medicine (Prescription_ID, Medicine_ID) VALUES (?, ?)",
+            "INSERT INTO Prescription_Medicine " +
+            "(Prescription_ID, Medicine_ID, Quantity, Instructions) " +
+            "VALUES (?, ?, ?, ?)",
             record.prescriptionId(),
-            record.medicineId()
+            record.medicineId(),
+            record.quantity(),
+            record.instructions()
         );
 
         return "Prescription medicine added successfully";
     }
 
-    // PUT update composite key
+    // PUT update prescription-medicine record
     @PutMapping("/{prescriptionId}/{medicineId}")
     public String update(
         @PathVariable int prescriptionId,
@@ -76,9 +88,14 @@ public class PrescriptionMedicineController {
         @RequestBody PrescriptionMedicineRequest record
     ) {
         int rows = jdbc.update(
-            "UPDATE Prescription_Medicine SET Prescription_ID = ?, Medicine_ID = ? WHERE Prescription_ID = ? AND Medicine_ID = ?",
+            "UPDATE Prescription_Medicine " +
+            "SET Prescription_ID = ?, Medicine_ID = ?, " +
+            "Quantity = ?, Instructions = ? " +
+            "WHERE Prescription_ID = ? AND Medicine_ID = ?",
             record.prescriptionId(),
             record.medicineId(),
+            record.quantity(),
+            record.instructions(),
             prescriptionId,
             medicineId
         );
@@ -99,7 +116,8 @@ public class PrescriptionMedicineController {
         @PathVariable int medicineId
     ) {
         int rows = jdbc.update(
-            "DELETE FROM Prescription_Medicine WHERE Prescription_ID = ? AND Medicine_ID = ?",
+            "DELETE FROM Prescription_Medicine " +
+            "WHERE Prescription_ID = ? AND Medicine_ID = ?",
             prescriptionId,
             medicineId
         );
@@ -115,11 +133,15 @@ public class PrescriptionMedicineController {
 
     public record PrescriptionMedicine(
         int prescriptionId,
-        int medicineId
+        int medicineId,
+        int quantity,
+        String instructions
     ) {}
 
     public record PrescriptionMedicineRequest(
         Integer prescriptionId,
-        Integer medicineId
+        Integer medicineId,
+        Integer quantity,
+        String instructions
     ) {}
 }

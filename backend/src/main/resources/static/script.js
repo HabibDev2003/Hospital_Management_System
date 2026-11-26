@@ -324,6 +324,30 @@ async function loadData() {
         }));
 
 
+
+        // Load prescription medicines from Oracle
+        const prescriptionMedicinesResponse = await fetch(
+            "/api/prescription-medicines"
+        );
+
+        if (!prescriptionMedicinesResponse.ok) {
+            throw new Error("Failed to load prescription medicines");
+        }
+
+        const prescriptionMedicinesData =
+            await prescriptionMedicinesResponse.json();
+
+        db.prescriptionMedicines = prescriptionMedicinesData.map(
+            (item, index) => ({
+                id: index + 1,
+                prescriptionId: item.prescriptionId,
+                medicineId: item.medicineId,
+                quantity: item.quantity,
+                instructions: item.instructions || ""
+            })
+        );
+
+
     } catch (error) {
         console.error("Data loading error:", error);
     }
@@ -515,6 +539,42 @@ async function saveMedicineToAPI(record, isEditing, id) {
     return true;
 }
 
+
+async function savePrescriptionMedicineToAPI(
+    record,
+    isEditing,
+    existingRecord = null
+) {
+    const payload = {
+        prescriptionId: Number(record.prescriptionId),
+        medicineId: Number(record.medicineId),
+        quantity: Number(record.quantity),
+        instructions: record.instructions || null
+    };
+
+    let url = "/api/prescription-medicines";
+    let method = "POST";
+
+    if (isEditing) {
+        url += `/${existingRecord.prescriptionId}/${existingRecord.medicineId}`;
+        method = "PUT";
+    }
+
+    const response = await fetch(url, {
+        method,
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+        const error = await response.text();
+        throw new Error(error || "Failed to save prescription medicine");
+    }
+
+    return response.text();
+}
 
 
 function save() {
@@ -1170,6 +1230,57 @@ if (bucket === "prescriptions") {
     return;
 }
 
+
+
+
+// Delete prescription medicines directly from Oracle
+if (bucket === "prescriptionMedicines") {
+    const item = get(bucket, id);
+
+    try {
+        const response = await fetch(
+            `/api/prescription-medicines/${item.prescriptionId}/${item.medicineId}`,
+            { method: "DELETE" }
+        );
+
+        if (!response.ok) {
+            throw new Error(
+                await response.text() ||
+                "Prescription medicine deletion failed."
+            );
+        }
+
+        const refreshResponse = await fetch(
+            "/api/prescription-medicines"
+        );
+
+        if (!refreshResponse.ok) {
+            throw new Error("Could not refresh prescription medicines.");
+        }
+
+        const data = await refreshResponse.json();
+
+        db.prescriptionMedicines = data.map((item, index) => ({
+            id: index + 1,
+            prescriptionId: item.prescriptionId,
+            medicineId: item.medicineId,
+            quantity: item.quantity,
+            instructions: item.instructions || ""
+        }));
+
+        render();
+        toast("Prescription medicine deleted successfully.");
+
+    } catch (error) {
+        console.error(error);
+        toast("Delete failed: " + error.message);
+    }
+
+    return;
+}
+
+
+
     const previousData = JSON.stringify(db);
 
     tree.forEach(entry => {
@@ -1501,6 +1612,7 @@ if (key === "prescriptions") {
 }
 
 
+
 // Save medicines directly through Java API to Oracle
 if (key === "medicines") {
     const isEditing = Boolean(editing);
@@ -1547,6 +1659,59 @@ if (key === "medicines") {
 
     return;
 }
+
+
+
+// Save prescription medicines directly through Oracle
+if (key === "prescriptionMedicines") {
+    const isEditing = Boolean(editing);
+
+    const existingRecord = isEditing
+        ? get(key, editing.id)
+        : null;
+
+    try {
+        await savePrescriptionMedicineToAPI(
+            record,
+            isEditing,
+            existingRecord
+        );
+
+        const response = await fetch(
+            "/api/prescription-medicines"
+        );
+
+        if (!response.ok) {
+            throw new Error(
+                "Could not refresh prescription medicines."
+            );
+        }
+
+        const data = await response.json();
+
+        db.prescriptionMedicines = data.map((item, index) => ({
+            id: index + 1,
+            prescriptionId: item.prescriptionId,
+            medicineId: item.medicineId,
+            quantity: item.quantity,
+            instructions: item.instructions || ""
+        }));
+
+        closeForm();
+        render();
+
+        toast(isEditing
+            ? "Prescription medicine updated successfully."
+            : "Prescription medicine created successfully.");
+
+    } catch (error) {
+        console.error(error);
+        toast("Prescription medicine save failed: " + error.message);
+    }
+
+    return;
+}
+
 
 
     const previousData = JSON.stringify(db);
