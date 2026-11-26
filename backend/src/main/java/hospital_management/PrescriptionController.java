@@ -63,7 +63,9 @@ public class PrescriptionController {
         @RequestBody PrescriptionRequest prescription
     ) {
         jdbc.update(
-            "INSERT INTO Prescription (Prescription_ID, Patient_ID, Doctor_ID, Prescription_Date) VALUES (?, ?, ?, ?)",
+            "INSERT INTO Prescription " +
+            "(Prescription_ID, Patient_ID, Doctor_ID, Prescription_Date) " +
+            "VALUES (?, ?, ?, ?)",
             prescription.prescriptionId(),
             prescription.patientId(),
             prescription.doctorId(),
@@ -80,7 +82,9 @@ public class PrescriptionController {
         @RequestBody PrescriptionRequest prescription
     ) {
         int rows = jdbc.update(
-            "UPDATE Prescription SET Patient_ID = ?, Doctor_ID = ?, Prescription_Date = ? WHERE Prescription_ID = ?",
+            "UPDATE Prescription " +
+            "SET Patient_ID = ?, Doctor_ID = ?, Prescription_Date = ? " +
+            "WHERE Prescription_ID = ?",
             prescription.patientId(),
             prescription.doctorId(),
             Date.valueOf(prescription.prescriptionDate()),
@@ -98,32 +102,36 @@ public class PrescriptionController {
 
     // DELETE prescription
     @DeleteMapping("/{id}")
-public String deletePrescription(@PathVariable int id) {
+    public String deletePrescription(@PathVariable int id) {
 
-    Integer medicineCount = jdbc.queryForObject(
-        "SELECT COUNT(*) FROM Prescription_Medicine WHERE Prescription_ID = ?",
-        Integer.class, id
-    );
-
-    if (medicineCount != null && medicineCount > 0) {
-        throw new ResponseStatusException(
-            HttpStatus.CONFLICT,
-            "Cannot delete prescription because prescribed medicines are linked to it."
+        Integer medicineCount = jdbc.queryForObject(
+            "SELECT COUNT(*) FROM Prescription_Medicine " +
+            "WHERE Prescription_ID = ?",
+            Integer.class,
+            id
         );
+
+        if (medicineCount != null && medicineCount > 0) {
+            throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Cannot delete prescription because prescribed medicines are linked to it."
+            );
+        }
+
+        int rows = jdbc.update(
+            "DELETE FROM Prescription WHERE Prescription_ID = ?",
+            id
+        );
+
+        if (rows == 0) {
+            throw new ResponseStatusException(
+                HttpStatus.NOT_FOUND, "Prescription not found"
+            );
+        }
+
+        return "Prescription deleted successfully";
     }
 
-    int rows = jdbc.update(
-        "DELETE FROM Prescription WHERE Prescription_ID = ?", id
-    );
-
-    if (rows == 0) {
-        throw new ResponseStatusException(
-            HttpStatus.NOT_FOUND, "Prescription not found"
-        );
-    }
-
-    return "Prescription deleted successfully";
-}
     // Prescription response
     public record Prescription(
         int prescriptionId,
