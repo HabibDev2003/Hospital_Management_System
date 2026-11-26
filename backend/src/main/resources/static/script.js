@@ -90,7 +90,7 @@ const schema = {
             ["patientId", "Patient", "ref:patients", 1],
             ["amount", "Amount (AFN)", "number", 1],
             ["date", "Payment date", "date", 1],
-            ["method", "Payment method", "select", 1, ["Cash", "Card", "Bank Transfer"]],
+            ["method", "Payment method", "select", 1, ["Cash", "Card"]],
             ["status", "Payment status", "select", 1,
                 ["Paid", "Pending"]]
         ]
@@ -344,8 +344,26 @@ async function loadData() {
                 medicineId: item.medicineId,
                 quantity: item.quantity,
                 instructions: item.instructions || ""
-            })
-        );
+            }));
+
+
+
+
+        // Load payments directly from Oracle
+        const paymentResponse = await fetch("/api/payments");
+
+        if (!paymentResponse.ok) {
+            throw new Error("Failed to load payments from Oracle.");
+        }
+
+        db.payments = (await paymentResponse.json()).map(item => ({
+            id: item.paymentId,
+            patientId: item.patientId,
+            amount: item.amount,
+            date: item.paymentDate,
+            method: item.paymentMethod,
+            status: item.paymentStatus
+        }));
 
 
     } catch (error) {
@@ -574,6 +592,39 @@ async function savePrescriptionMedicineToAPI(
     }
 
     return response.text();
+}
+
+
+
+async function savePaymentToAPI(record, isEditing, id) {
+    const payment = {
+        paymentId: isEditing ? Number(id) : Number(record.id),
+        patientId: Number(record.patientId),
+        amount: Number(record.amount),
+        paymentDate: record.date,
+        paymentMethod: record.method,
+        paymentStatus: record.status
+    };
+
+    const url = isEditing
+        ? `/api/payments/${id}`
+        : "/api/payments";
+
+    const response = await fetch(url, {
+        method: isEditing ? "PUT" : "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payment)
+    });
+
+    if (!response.ok) {
+        throw new Error(
+            await response.text() || "Payment operation failed."
+        );
+    }
+
+    return true;
 }
 
 
@@ -1281,6 +1332,99 @@ if (bucket === "prescriptionMedicines") {
 
 
 
+// Delete payments directly from Oracle
+if (bucket === "payments") {
+    try {
+        const response = await fetch(`/api/payments/${id}`, {
+            method: "DELETE"
+        });
+
+        if (!response.ok) {
+            throw new Error(
+                await response.text() || "Payment deletion failed."
+            );
+        }
+
+        const refreshResponse = await fetch("/api/payments");
+
+        if (!refreshResponse.ok) {
+            throw new Error("Could not refresh payments.");
+        }
+
+        db.payments = (await refreshResponse.json()).map(item => ({
+            id: item.paymentId,
+            patientId: item.patientId,
+            amount: item.amount,
+            date: item.paymentDate,
+            method: item.paymentMethod,
+            status: item.paymentStatus
+        }));
+
+        render();
+        toast("Payment deleted successfully.");
+
+    } catch (error) {
+        console.error(error);
+        toast("Payment delete failed: " + error.message);
+    }
+
+    return;
+}
+
+
+
+// Delete medicines directly from Oracle
+if (bucket === "medicines") {
+    // Prevent deletion if the medicine is used in prescriptions
+    const isUsed = db.prescriptionMedicines.some(
+        item => Number(item.medicineId) === Number(id)
+    );
+
+    if (isUsed) {
+        toast("Cannot delete this medicine because it is used in prescriptions.");
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/medicines/${id}`, {
+            method: "DELETE"
+        });
+
+        if (!response.ok) {
+            throw new Error(
+                await response.text() || "Medicine deletion failed."
+            );
+        }
+
+        const refreshResponse = await fetch("/api/medicines");
+
+        if (!refreshResponse.ok) {
+            throw new Error("Could not refresh medicines.");
+        }
+
+        const medicines = await refreshResponse.json();
+
+        db.medicines = medicines.map(item => ({
+            id: item.medicineId,
+            name: item.medicineName,
+            quantity: item.quantity,
+            price: item.unitPrice,
+            expiry: String(item.expiryDate).slice(0, 10)
+        }));
+
+        save();
+        render();
+        toast("Medicine deleted successfully.");
+
+    } catch (error) {
+        console.error(error);
+        toast("Medicine delete failed: " + error.message);
+    }
+
+    return;
+}
+
+
     const previousData = JSON.stringify(db);
 
     tree.forEach(entry => {
@@ -1712,6 +1856,55 @@ if (key === "prescriptionMedicines") {
     return;
 }
 
+
+
+// Save payments directly through Java API to Oracle
+if (key === "payments") {
+    const isEditing = Boolean(editing);
+
+    if (!isEditing) {
+        record.id = Math.max(
+            0,
+            ...db.payments.map(item => Number(item.id) || 0)
+        ) + 1;
+    }
+
+    try {
+        await savePaymentToAPI(
+            record,
+            isEditing,
+            editing?.id
+        );
+
+        const response = await fetch("/api/payments");
+
+        if (!response.ok) {
+            throw new Error("Could not refresh payments.");
+        }
+
+        db.payments = (await response.json()).map(item => ({
+            id: item.paymentId,
+            patientId: item.patientId,
+            amount: item.amount,
+            date: item.paymentDate,
+            method: item.paymentMethod,
+            status: item.paymentStatus
+        }));
+
+        closeForm();
+        render();
+
+        toast(isEditing
+            ? "Payment updated successfully."
+            : "Payment created successfully.");
+
+    } catch (error) {
+        console.error(error);
+        toast("Payment save failed: " + error.message);
+    }
+
+    return;
+}
 
 
     const previousData = JSON.stringify(db);
