@@ -112,9 +112,9 @@ const schema = {
             ["amount", "Amount (AFN)", "number", 1],
             ["date", "Expense date", "date", 1],
             ["method", "Payment method", "select", 1,
-                ["Cash", "Card", "Bank transfer"]],
+            ["Cash", "Card", "Bank Transfer"]],
             ["status", "Payment status", "select", 1,
-                ["Paid", "Pending", "Failed"]],
+            ["Paid", "Pending"]],
             ["userId", "Recorded by user", "ref:users", 1]
         ]
     },
@@ -124,10 +124,13 @@ const schema = {
         singular: "user",
         fields: [
             ["username", "Username", "text", 1],
+            ["password", "Password", "password", 0],
             ["role", "Role", "select", 1,
-                ["Admin", "Receptionist", "Doctor"]]
+                ["Admin", "Receptionist", "Doctor"]],
+            ["fullName", "Full name", "text", 1],
+            ["email", "Email", "email", 1]
         ]
-    }
+    },
 };
 
 const seed = {
@@ -366,11 +369,55 @@ async function loadData() {
         }));
 
 
+
+        try {
+    const response = await fetch("/api/expenses");
+
+    if (!response.ok) {
+        throw new Error("Failed to load expenses");
+    }
+
+    const expenses = await response.json();
+
+    db.expenses = expenses.map(item => ({
+        id: Number(item.expenseId),
+        category: item.expenseCategory,
+        description: item.description,
+        amount: Number(item.amount),
+        date: String(item.expenseDate).slice(0, 10),
+        method: item.paymentMethod,
+        status: item.paymentStatus,
+        userId: Number(item.userId)
+    }));
+
+
+
+    // Load users from Oracle
+    const usersResponse = await fetch("/api/users");
+
+    if (!usersResponse.ok) {
+        throw new Error("Failed to load users");
+    }
+
+    const users = await usersResponse.json();
+
+    db.users = users.map(user => ({
+        id: Number(user.userId),
+        username: user.username,
+        role: user.role,
+        fullName: user.fullName,
+        email: user.email
+    }));
+
+
+
+        } catch (error) {
+            console.error("Expense or user loading error:", error);
+        }
     } catch (error) {
-        console.error("Data loading error:", error);
+        console.error("Main data loading error:", error);
     }
 }
-
 
 
 
@@ -626,6 +673,63 @@ async function savePaymentToAPI(record, isEditing, id) {
 
     return true;
 }
+
+async function saveExpenseToAPI(record, isEditing, id) {
+    const payload = {
+        expenseId: isEditing ? Number(id) : Number(record.id),
+        expenseCategory: record.category,
+        description: record.description,
+        amount: Number(record.amount),
+        expenseDate: record.date,
+        paymentMethod: record.method,
+        paymentStatus: record.status,
+        userId: Number(record.userId)
+    };
+
+    const response = await fetch(
+        isEditing ? `/api/expenses/${id}` : "/api/expenses",
+        {
+            method: isEditing ? "PUT" : "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        }
+    );
+
+    if (!response.ok) {
+        throw new Error(await response.text());
+    }
+}
+
+
+
+async function saveUserToAPI(record, isEditing, id) {
+    const payload = {
+        userId: isEditing ? Number(id) : Number(record.id),
+        username: record.username,
+        role: record.role,
+        fullName: record.fullName,
+        email: record.email
+    };
+
+    // Send password only when creating or changing it
+    if (!isEditing || record.password?.trim()) {
+        payload.password = record.password;
+    }
+
+    const response = await fetch(
+        isEditing ? `/api/users/${id}` : "/api/users",
+        {
+            method: isEditing ? "PUT" : "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        }
+    );
+
+    if (!response.ok) {
+        throw new Error(await response.text());
+    }
+}
+
 
 
 function save() {
@@ -1014,13 +1118,18 @@ function openForm(key, id = null) {
     $("fields").innerHTML = config.fields.map(field => {
         const [name, label, type, required, options] = field;
         const value = id === null ? "" : (get(key, id)?.[name] ?? "");
+
+        // Password is required only when creating a user
+        const isPassword = key === "users" && name === "password";
+        const isRequired = isPassword ? id === null : required;
+
         let control;
 
         if (type.startsWith("ref:")) {
             const bucket = type.slice(4);
 
             control = `
-                <select class="input" name="${name}" ${required ? "required" : ""}>
+                <select class="input" name="${name}" ${isRequired ? "required" : ""}>
                     <option value="">Choose ${label.toLowerCase()}...</option>
                     ${optionsFor(bucket).map(option => `
                         <option value="${option.value}"
@@ -1031,7 +1140,7 @@ function openForm(key, id = null) {
                 </select>`;
         } else if (type === "select") {
             control = `
-                <select class="input" name="${name}" ${required ? "required" : ""}>
+                <select class="input" name="${name}" ${isRequired ? "required" : ""}>
                     <option value="">Choose...</option>
                     ${options.map(option => `
                         <option value="${esc(option)}"
@@ -1043,14 +1152,15 @@ function openForm(key, id = null) {
         } else {
             control = `
                 <input class="input" name="${name}" type="${type}"
-                    value="${esc(value)}"
+                    value="${isPassword ? "" : esc(value)}"
+                    ${isPassword && id !== null ? 'placeholder="Leave blank to keep current password"' : ""}
                     ${type === "number" ? 'min="0" step="any"' : ""}
-                    ${required ? "required" : ""}>`;
+                    ${isRequired ? "required" : ""}>`;
         }
 
         return `
             <div class="field">
-                <label>${esc(label)}${required ? " *" : ""}</label>
+                <label>${esc(label)}${isRequired ? " *" : ""}</label>
                 ${control}
             </div>`;
     }).join("");
@@ -1125,6 +1235,48 @@ async function deleteRecord(bucket, id) {
         toast("Record not found. Refresh the page and try again.");
         return;
     }
+
+
+// Delete users directly from Oracle
+if (bucket === "users") {
+    if (!window.confirm("Delete this user? This cannot be undone.")) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/users/${id}`, {
+            method: "DELETE"
+        });
+
+        if (!response.ok) {
+            throw new Error(
+                await response.text() || "User deletion failed."
+            );
+        }
+
+        const refreshResponse = await fetch("/api/users");
+
+        if (!refreshResponse.ok) {
+            throw new Error("Could not refresh users.");
+        }
+
+        db.users = (await refreshResponse.json()).map(item => ({
+            id: Number(item.userId),
+            username: item.username,
+            role: item.role
+        }));
+
+        render();
+        toast("User deleted successfully.");
+
+    } catch (error) {
+        console.error(error);
+        toast("User delete failed: " + error.message);
+    }
+
+    return;
+}
+
 
     const tree = bucket === "prescriptions"
     ? [{ bucket, id: Number(id) }]
@@ -1419,6 +1571,51 @@ if (bucket === "medicines") {
     } catch (error) {
         console.error(error);
         toast("Medicine delete failed: " + error.message);
+    }
+
+    return;
+}
+
+
+
+// Delete expenses directly from Oracle
+if (bucket === "expenses") {
+    try {
+        const response = await fetch(`/api/expenses/${id}`, {
+            method: "DELETE"
+        });
+
+        if (!response.ok) {
+            throw new Error(
+                await response.text() || "Expense deletion failed."
+            );
+        }
+
+        const refreshResponse = await fetch("/api/expenses");
+
+        if (!refreshResponse.ok) {
+            throw new Error("Could not refresh expenses.");
+        }
+
+        const expenses = await refreshResponse.json();
+
+        db.expenses = expenses.map(item => ({
+            id: Number(item.expenseId),
+            category: item.expenseCategory,
+            description: item.description,
+            amount: Number(item.amount),
+            date: String(item.expenseDate).slice(0, 10),
+            method: item.paymentMethod,
+            status: item.paymentStatus,
+            userId: Number(item.userId)
+        }));
+
+        render();
+        toast("Expense deleted from Oracle successfully.");
+
+    } catch (error) {
+        console.error(error);
+        toast("Expense delete failed: " + error.message);
     }
 
     return;
@@ -1905,6 +2102,97 @@ if (key === "payments") {
 
     return;
 }
+
+
+
+// Save expenses directly to Oracle
+if (key === "expenses") {
+    const isEditing = Boolean(editing);
+
+    if (!isEditing) {
+        record.id = Math.max(
+            8000,
+            ...db.expenses.map(item => Number(item.id) || 0)
+        ) + 1;
+    }
+
+    try {
+        await saveExpenseToAPI(record, isEditing, editing?.id);
+
+        const response = await fetch("/api/expenses");
+
+        if (!response.ok) {
+            throw new Error("Could not refresh expenses.");
+        }
+
+        db.expenses = (await response.json()).map(item => ({
+            id: Number(item.expenseId),
+            category: item.expenseCategory,
+            description: item.description,
+            amount: Number(item.amount),
+            date: String(item.expenseDate).slice(0, 10),
+            method: item.paymentMethod,
+            status: item.paymentStatus,
+            userId: Number(item.userId)
+        }));
+
+        closeForm();
+        render();
+        toast(isEditing
+            ? "Expense updated successfully."
+            : "Expense created successfully.");
+
+    } catch (error) {
+        console.error(error);
+        toast("Expense save failed: " + error.message);
+    }
+
+    return;
+}
+
+
+// Save users directly to Oracle
+if (key === "users") {
+    const isEditing = Boolean(editing);
+
+    if (!isEditing) {
+        record.id = Math.max(
+            3000,
+            ...db.users.map(item => Number(item.id) || 0)
+        ) + 1;
+    }
+
+    try {
+        await saveUserToAPI(record, isEditing, editing?.id);
+
+        const response = await fetch("/api/users");
+
+        if (!response.ok) {
+            throw new Error("Could not refresh users.");
+        }
+
+       db.users = (await response.json()).map(item => ({
+            id: Number(item.userId),
+            username: item.username,
+            role: item.role,
+            fullName: item.fullName,
+            email: item.email
+        }));
+
+        closeForm();
+        render();
+        toast(isEditing
+            ? "User updated successfully."
+            : "User created successfully.");
+
+    } catch (error) {
+        console.error(error);
+        toast("User save failed: " + error.message);
+    }
+
+    return;
+}
+
 
 
     const previousData = JSON.stringify(db);

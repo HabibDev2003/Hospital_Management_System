@@ -1,4 +1,3 @@
-
 package hospital_management;
 
 import java.util.List;
@@ -22,7 +21,6 @@ public class UserController {
         this.jdbc = jdbc;
     }
 
-    // GET all users without passwords
     @GetMapping
     public List<User> getAllUsers() {
         return jdbc.query(
@@ -35,7 +33,6 @@ public class UserController {
         );
     }
 
-    // GET user by ID without password
     @GetMapping("/{id}")
     public User getUserById(@PathVariable int id) {
         List<User> users = jdbc.query(
@@ -57,10 +54,8 @@ public class UserController {
         return users.get(0);
     }
 
-    // POST new user with encrypted password
     @PostMapping
     public String addUser(@RequestBody UserRequest user) {
-
         validateUser(user);
 
         String encryptedPassword =
@@ -77,13 +72,11 @@ public class UserController {
         return "User added successfully";
     }
 
-    // PUT update user
     @PutMapping("/{id}")
     public String updateUser(
         @PathVariable int id,
         @RequestBody UserRequest user
     ) {
-
         if (user.username() == null || user.username().isBlank()
                 || user.role() == null || user.role().isBlank()) {
             throw new ResponseStatusException(
@@ -94,9 +87,7 @@ public class UserController {
 
         int rows;
 
-        // If password is supplied, update it securely
         if (user.password() != null && !user.password().isBlank()) {
-
             String encryptedPassword =
                     passwordEncoder.encode(user.password());
 
@@ -107,9 +98,7 @@ public class UserController {
                 user.role(),
                 id
             );
-
         } else {
-            // If password is empty, keep the existing password
             rows = jdbc.update(
                 "UPDATE Users SET Username = ?, Role = ? WHERE User_ID = ?",
                 user.username(),
@@ -127,10 +116,8 @@ public class UserController {
         return "User updated successfully";
     }
 
-    // DELETE user
     @DeleteMapping("/{id}")
     public String deleteUser(@PathVariable int id) {
-
         int rows = jdbc.update(
             "DELETE FROM Users WHERE User_ID = ?",
             id
